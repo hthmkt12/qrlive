@@ -103,25 +103,17 @@ export async function updateGeoRoutesInDB(
   linkId: string,
   geoRoutes: { country: string; countryCode: string; targetUrl: string; bypassUrl?: string }[]
 ) {
-  // Delete existing routes
-  await supabase.from("geo_routes").delete().eq("link_id", linkId);
-
-  // Insert new routes
-  if (geoRoutes.length > 0) {
-    const routes = geoRoutes
-      .filter((r) => r.countryCode && r.targetUrl)
-      .map((r) => ({
-        link_id: linkId,
-        country: r.country,
-        country_code: r.countryCode,
-        target_url: r.targetUrl,
-        bypass_url: r.bypassUrl || null,
-      }));
-
-    if (routes.length > 0) {
-      await supabase.from("geo_routes").insert(routes);
-    }
-  }
+  // Atomic delete + insert via Postgres function — prevents partial state on insert failure
+  const { error } = await supabase.rpc("upsert_geo_routes", {
+    p_link_id: linkId,
+    p_routes: geoRoutes.map((r) => ({
+      country: r.country,
+      country_code: r.countryCode,
+      target_url: r.targetUrl,
+      bypass_url: r.bypassUrl || "",
+    })),
+  });
+  if (error) throw error;
 }
 
 export async function deleteLinkInDB(id: string) {
