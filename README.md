@@ -12,7 +12,7 @@ A production-ready QR code link management platform with geo-routing, bypass URL
 
 ### Core Functionality
 - **Auth System**: Email/password signup, login, logout with session persistence
-- **QR Link Management**: Create, edit, delete, and toggle QR links with 6-character alphanumeric short codes
+- **QR Link Management**: Create, edit, delete, and toggle QR links with auto-generated 6-character codes or custom 3-20 character short codes
 - **Geo-Routing**: Route visitors to different URLs based on 15 supported countries (US, GB, JP, KR, DE, FR, VN, TH, SG, AU, CA, BR, IN, CN, RU)
 - **Bypass URLs**: Optional override URLs for accessing geo-blocked content (priority: bypass_url → target_url → default_url)
 - **Click Analytics**: Real-time tracking with 7-day charts, country distribution, referer breakdown, and bot filtering
@@ -97,13 +97,14 @@ src/
 ├── hooks/               # useLinks, useLinkMutations, useMobile
 ├── lib/                 # Database ops, schemas, types, utilities
 ├── integrations/        # Supabase client
-├── test/                # 33 unit/integration tests
+├── test/                # 37 unit/integration tests
 └── App.tsx              # Root component + routing
 
 supabase/
 ├── functions/redirect/  # Edge function for QR redirects
-└── migrations/          # 4 database migrations
+└── migrations/          # 6 database migrations
 
+proxy-gateway/           # Always-on bypass gateway via HTTP/SOCKS5 proxy vendor
 docs/                    # Documentation (see below)
 ```
 
@@ -133,7 +134,7 @@ npm run typecheck       # TypeScript type checking
 npm run lint            # ESLint code quality
 
 # Testing
-npm run test            # Run all tests (33 tests)
+npm run test            # Run app test suite (37 Vitest tests)
 npm run test:watch     # Watch mode for development
 
 # Building
@@ -143,20 +144,28 @@ npm run preview         # Preview production build locally
 # Local Supabase (optional)
 supabase start          # Start local Postgres + Auth + Edge Functions
 supabase db push        # Apply migrations
+
+# Proxy gateway (optional, for bypass_url deployment)
+npm run gateway:install # Install proxy-gateway dependencies
+npm run gateway:dev     # Run always-on gateway locally
+npm run gateway:check   # Smoke-check gateway module loading
+npm run gateway:test    # Run proxy-gateway smoke tests
 ```
 
 ---
 
 ## Testing
 
-33 tests covering:
+37 app tests covering:
 - **Schemas** (17 tests): Zod validation for links, auth, geo routes
-- **Database** (7 tests): CRUD operations, short code generation
+- **Database** (11 tests): CRUD operations, short code generation, analytics query helpers
 - **Auth Context** (8 tests): Session management, login/logout
+- **Sanity Check** (1 test): Base Vitest wiring
 
 Run tests:
 ```bash
 npm run test          # Once
+npm run gateway:test  # Proxy-gateway smoke tests (3 tests)
 npm run test:watch   # Watch mode
 ```
 
@@ -175,7 +184,7 @@ npm run test:watch   # Watch mode
 - Fallback to default_url if geo data unavailable
 
 ### Edge Function (redirect/{shortCode})
-- Validates short code format (6-char alphanumeric)
+- Validates short code format (`^[A-Z0-9_-]{3,20}$`)
 - Rate limits to 1 click per IP per 60 seconds
 - Filters bots/crawlers (skip click recording)
 - Records click events for analytics
@@ -191,13 +200,12 @@ npm run test:watch   # Watch mode
 ## Known Issues & Roadmap
 
 ### Current Issues (Medium Priority)
-1. React key uses `country_code` instead of unique `id` (potential re-render bugs)
-2. Non-null assertion on `user!.id` in CreateLinkDialog (should be optional check)
-3. 0% component test coverage (StatsPanel, LinkCard, forms)
-4. refetchInterval 10s may overload database (consider reducing)
+1. Business components still lack automated tests (`StatsPanel`, `LinkCard`, dialogs, `QRPreview`)
+2. Detailed analytics now use server-side aggregate RPCs, but very high-volume or long-range reporting will eventually want pre-aggregated rollups or caching
+3. The redirect edge function still relies on manual verification; only the proxy gateway now has automated smoke tests
+4. Production build currently emits a large main chunk warning and would benefit from code-splitting
 
 ### Planned Features (Q2 2026)
-- Custom short codes (user-defined)
 - Link expiration dates
 - Password-protected links
 - Advanced analytics (date range filtering, exports)
@@ -222,6 +230,14 @@ vercel --prod
 supabase functions deploy redirect --no-verify-jwt
 ```
 
+### Optional Bypass Gateway
+```bash
+cd proxy-gateway
+npm install
+npm run test
+npm run start
+```
+
 See [deployment-guide.md](./docs/deployment-guide.md) for detailed instructions.
 
 ---
@@ -233,7 +249,7 @@ See [deployment-guide.md](./docs/deployment-guide.md) for detailed instructions.
 | Redirect Latency | <100ms | ~50ms (Cloudflare edge) |
 | Page Load | <2s | ~1.5s (Vercel CDN) |
 | Build Time | <30s | ~10s |
-| Test Coverage | >80% | 66% (33/33 tests passing) |
+| Test Coverage | >80% | 66% (40 tests passing) |
 | Uptime | 99.9% | 100% (current) |
 
 ---
@@ -245,7 +261,7 @@ See [deployment-guide.md](./docs/deployment-guide.md) for detailed instructions.
 - ✅ Rate limiting (1 click per IP per 60s)
 - ✅ Bot filtering (skips analytics for crawlers)
 - ✅ CORS headers on edge function
-- ✅ Auth tokens use httpOnly cookies (Supabase default)
+- ✅ Session persistence via Supabase JS client (`localStorage` in current app config)
 
 ---
 

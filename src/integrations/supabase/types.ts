@@ -128,7 +128,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_link_click_detail: {
+        Args: {
+          p_link_id: string
+        }
+        Returns: {
+          clicks_by_day: Json
+          countries_count: number
+          country_breakdown: Json
+          link_id: string
+          referer_breakdown: Json
+          today_clicks: number
+          total_clicks: number
+        }[]
+      }
+      get_link_click_summaries: {
+        Args: {
+          p_link_ids: string[] | null
+        }
+        Returns: {
+          link_id: string
+          today_clicks: number
+          top_country_code: string | null
+          total_clicks: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

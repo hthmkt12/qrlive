@@ -84,13 +84,15 @@ src/
   - Columns: `short_code`, `default_url`, `country_code`, `user_id`, `created_at`
 
 ### React Query
-- **Hierarchical object-based keys**
+- **Centralized query key factory**
   ```typescript
-  links: {
-    all: ["links"],
-    list: () => ["links", "list"],
-    detail: (id) => ["links", "list", { id }],
-  }
+  links: ["links"],
+  link: (id) => ["links", id],
+  analytics: {
+    all: ["links", "analytics"],
+    summaries: (linkIds) => ["links", "analytics", "summaries", ...linkIds],
+    detail: (id) => ["links", "analytics", "detail", id],
+  },
   ```
 
 ---
@@ -104,8 +106,9 @@ src/
 // hooks/use-links.ts
 export function useLinks() {
   return useQuery({
-    queryKey: queryKeys.links.list(),
+    queryKey: QUERY_KEYS.links,
     queryFn: fetchLinks,
+    staleTime: 30_000,
   });
 }
 
@@ -306,7 +309,7 @@ export const supabase = createClient<Database>(
 export async function fetchLinks(): Promise<QRLinkRow[]> {
   const { data, error } = await supabase
     .from("qr_links")
-    .select("*, geo_routes(*), click_events(*)")
+    .select("*, geo_routes(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -320,9 +323,10 @@ export async function createLinkInDB(
   name: string,
   defaultUrl: string,
   geoRoutes: GeoRouteInput[],
-  userId: string
+  userId: string,
+  customShortCode?: string
 ): Promise<QRLinkRow> {
-  const shortCode = await generateShortCode(); // Collision-safe
+  const shortCode = customShortCode || await generateShortCode(); // Optional custom code, else collision-safe
 
   const { data: link, error } = await supabase
     .from("qr_links")
@@ -349,7 +353,7 @@ export async function createLinkInDB(
     }
   }
 
-  return { ...link, geo_routes: [], click_events: [] } as QRLinkRow;
+  return { ...link, geo_routes: [] } as QRLinkRow;
 }
 ```
 
@@ -464,7 +468,7 @@ async function handleCreateLink(data: LinkFormInput) {
 export async function fetchLinks(): Promise<QRLinkRow[]> {
   const { data, error } = await supabase
     .from("qr_links")
-    .select("*, geo_routes(*), click_events(*)")
+    .select("*, geo_routes(*)")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -633,10 +637,10 @@ VITE_SUPABASE_PUBLISHABLE_KEY=[key]
 - No non-null assertions (except justified cases)
 
 ### Known Issues to Fix
-1. Replace `user!.id` with null check in CreateLinkDialog
-2. Use unique `id` for geo route React keys (not country_code)
-3. Consider reducing refetchInterval (10s may overload DB)
-4. Add component test coverage (StatsPanel, LinkCard, forms)
+1. Add component test coverage for business components (StatsPanel, LinkCard, dialogs, QRPreview)
+2. Add automated coverage for redirect edge paths (proxy-gateway already has smoke tests)
+3. Add cached rollups or materialized summaries for higher-volume and longer-range analytics
+4. Split the main production bundle to reduce the Vite chunk-size warning
 
 ---
 
@@ -653,6 +657,7 @@ npm run lint      # ESLint
 ### Testing
 ```bash
 npm run test      # Run all tests
+npm run gateway:test # Run proxy-gateway smoke tests
 npm run test:watch # Watch mode
 ```
 

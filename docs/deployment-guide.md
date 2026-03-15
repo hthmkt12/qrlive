@@ -515,7 +515,7 @@ supabase db push
 - [ ] Edge function blocks javascript: and data: URLs
 - [ ] Rate limiting enabled (1 click/IP/60s)
 - [ ] CORS headers configured on edge function
-- [ ] Auth tokens use httpOnly cookies (Supabase default)
+- [ ] Session persistence behavior verified (`localStorage` in current Supabase client config)
 - [ ] Database backups enabled (Supabase default)
 
 ---
@@ -581,6 +581,142 @@ server {
 - Ping từ HK VPS để verify connectivity đến Supabase
 
 ---
+
+## Legacy Japan Proxy Server (China GFW — Content Bypass)
+
+For QR links where the **destination website** is blocked by GFW (not just the redirect URL):
+
+### How It Works
+
+```
+CN user scans QR
+  → Cloudflare Worker → Supabase redirect edge function
+    → geo_route for CN → bypass_url = https://jp.company.com/page
+      → Japan nginx reverse proxy (Tokyo VPS)
+        → actual origin server (www.company.com)
+```
+
+The `bypass_url` field in each CN geo-route points to the Japan proxy. No QRLive code changes needed — `bypass_url` is already supported.
+Use this only if you intentionally want to operate your own nginx reverse proxy instead of the newer `proxy-gateway` service.
+
+### Setup (Japan VPS — Recommended)
+
+```bash
+# 1. Provision Tokyo VPS (~$5-6/mo: Vultr, Linode, AWS Lightsail ap-northeast-1)
+# 2. Copy japan-proxy/ to VPS, then run:
+bash setup.sh jp.company.com admin@company.com
+
+# 3. Edit nginx site config — set proxy_pass to your origin:
+vim japan-proxy/nginx/conf.d/proxy-jp-company-com.conf
+# Change: proxy_pass https://www.company.com;
+#    And: proxy_set_header Host www.company.com;
+
+# 4. Restart nginx
+docker compose restart nginx
+
+# 5. Verify
+curl -sf https://jp.company.com/health
+```
+
+### Configure bypass_url in QRLive
+
+1. Dashboard → edit QR link → geo-routes section
+2. Add CN (China) row:
+   - **Target URL**: `https://www.company.com/page` (original)
+   - **Bypass URL**: `https://jp.company.com/page` (Japan proxy)
+3. Save → test with `curl -H "cf-ipcountry: CN"` against redirect function
+
+### Alternative: Supabase Edge Function Proxy (Zero-Infra, Testing Only)
+
+```bash
+# Deploy
+supabase secrets set PROXY_SECRET=your-random-secret
+supabase secrets set PROXY_ALLOWED_HOSTS=www.company.com
+supabase functions deploy proxy --no-verify-jwt
+
+# bypass_url format:
+# https://PROJECT.supabase.co/functions/v1/proxy?url=https://www.company.com/page&key=SECRET
+```
+
+**Warning:** `supabase.co` may itself be blocked by GFW. Use Japan VPS for production.
+
+### What Works / What Doesn't
+
+| Content Type | Works? | Notes |
+|---|---|---|
+| Own landing page (HTML) | ✅ | Primary use case |
+| Own file downloads | ✅ | `proxy_buffering off` for large files |
+| Own SPA (React/Vue) | ⚠️ Partial | Works if all assets served from same domain |
+| Facebook / Instagram | ❌ | OAuth, CSP, JS-heavy — not feasible |
+| Google / YouTube | ❌ | DRM, auth, reCAPTCHA — not feasible |
+
+For blocked third-party sites: host a mirror page on your own server, proxy that instead.
+
+---
+
+## Proxy Gateway with Vendor Proxy (Recommended)
+
+For QR links where the **destination website** is blocked by GFW, the recommended path is now:
+
+```
+CN user scans QR
+  → Cloudflare Worker → Supabase redirect edge function
+    → geo_route for CN → bypass_url = https://jp.company.com/page
+      → proxy-gateway (always-on Node service)
+        → outbound HTTP/SOCKS5 proxy vendor
+          → actual origin server
+```
+
+This keeps `bypass_url` as a normal HTTPS URL for browsers while moving proxy credentials and egress handling to the server side.
+
+### Setup (Recommended)
+
+```bash
+# 1. Configure proxy-gateway/.env
+cd proxy-gateway
+cp .env.example .env
+
+# 2. Install dependencies and verify module loading
+npm install
+npm run check
+npm run test
+
+# 3. Run locally
+npm run dev
+```
+
+Required env vars:
+
+- `UPSTREAM_ORIGIN=https://www.company.com`
+- `OUTBOUND_PROXY_URL=socks5://user:pass@proxy.vendor.com:1080`
+- `PORT=8080`
+
+### Deploy on Fly.io
+
+```bash
+cd proxy-gateway
+cp fly.toml.example fly.toml
+# Edit app name if needed
+fly launch --copy-config --no-deploy
+fly secrets set \
+  UPSTREAM_ORIGIN=https://www.company.com \
+  OUTBOUND_PROXY_URL=socks5://user:pass@proxy.vendor.com:1080
+fly deploy
+```
+
+`fly.toml.example` keeps one machine running so the gateway stays available for QR traffic.
+
+### Configure bypass_url in QRLive
+
+1. Dashboard → edit QR link → geo-routes section
+2. Add CN (China) row:
+   - **Target URL**: `https://www.company.com/page`
+   - **Bypass URL**: `https://jp.company.com/page`
+3. Save → test with `curl -H "cf-ipcountry: CN"` against redirect function
+
+### Legacy alternative
+
+The nginx-based `japan-proxy/` setup still works, but it is now a legacy alternative when you prefer your own reverse proxy over a vendor-backed HTTP/SOCKS5 egress path.
 
 ## Support & Resources
 

@@ -14,17 +14,19 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { COUNTRIES } from "@/lib/types";
-import { getRedirectUrl, QRLinkRow } from "@/lib/db";
+import { getRedirectUrl, LinkAnalyticsSummaryRow, QRLinkRow } from "@/lib/db";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteLink, useToggleActive } from "@/hooks/use-link-mutations";
 
 interface LinkCardProps {
   link: QRLinkRow;
+  analytics?: LinkAnalyticsSummaryRow;
+  analyticsLoading?: boolean;
   onSelect: (link: QRLinkRow) => void;
   onEdit: (link: QRLinkRow) => void;
 }
 
-export function LinkCard({ link, onSelect, onEdit }: LinkCardProps) {
+export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, onEdit }: LinkCardProps) {
   const { toast } = useToast();
   const wrapperUrl = getRedirectUrl(link.short_code);
   const deleteLink = useDeleteLink();
@@ -43,21 +45,11 @@ export function LinkCard({ link, onSelect, onEdit }: LinkCardProps) {
     toggleActive.mutate({ id: link.id, isActive: !link.is_active });
   };
 
-  const clicks = link.click_events || [];
-  const totalClicks = clicks.length;
-  const todayClicks = clicks.filter(
-    (c) => new Date(c.created_at).toDateString() === new Date().toDateString()
-  ).length;
-
-  const topCountry = clicks.reduce(
-    (acc, c) => {
-      if (c.country_code) acc[c.country_code] = (acc[c.country_code] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-  const topCC = Object.entries(topCountry).sort(([, a], [, b]) => b - a)[0];
-  const topCountryInfo = topCC ? COUNTRIES.find((c) => c.code === topCC[0]) : null;
+  const totalClicks = analytics?.total_clicks ?? 0;
+  const todayClicks = analytics?.today_clicks ?? 0;
+  const topCountryInfo = analytics?.top_country_code
+    ? COUNTRIES.find((c) => c.code === analytics.top_country_code)
+    : null;
 
   return (
     <motion.div
@@ -152,7 +144,7 @@ export function LinkCard({ link, onSelect, onEdit }: LinkCardProps) {
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <BarChart3 className="h-3 w-3" />
-              {totalClicks} clicks
+              {analyticsLoading ? "..." : `${totalClicks} clicks`}
             </span>
             <span>Hôm nay: {todayClicks}</span>
             {topCountryInfo && (

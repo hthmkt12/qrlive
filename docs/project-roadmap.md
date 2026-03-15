@@ -49,7 +49,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 ### Phase 04: React Query Migration ✅
 - [x] TanStack React Query v5 setup
 - [x] Query key factory pattern
-- [x] useLinks hook (fetch with relations)
+- [x] useLinks hook (links + geo routes) plus split analytics queries
 - [x] useLinkMutations hook (create/update/delete)
 - [x] Automatic cache invalidation
 - [x] Error handling & toast notifications
@@ -57,7 +57,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 
 ### Phase 05: Edge Function Hardening ✅
 - [x] Redirect function (Deno runtime)
-- [x] Short code validation (6-char alphanumeric)
+- [x] Short code validation (`^[A-Z0-9_-]{3,20}$`)
 - [x] Geo detection (cf-ipcountry header)
 - [x] Rate limiting (1 click/IP/60s)
 - [x] Bot filtering (crawlers/spiders)
@@ -83,7 +83,10 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Schema validation tests (17 tests)
 - [x] Database utility tests (7 tests)
 - [x] Auth context tests (8 tests)
-- [x] All tests passing (33/33)
+- [x] Vitest sanity test (1 test)
+- [x] Proxy gateway smoke tests (3 tests)
+- [x] Analytics query helper tests (4 tests)
+- [x] All tests passing (40/40 across app + gateway)
 - [x] Test setup & fixtures
 
 ### Phase 08: Deployment ✅
@@ -91,10 +94,11 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Supabase backend setup
 - [x] Edge function deployment
 - [x] Environment variable configuration
-- [x] Database migrations (4 migrations)
+- [x] Database migrations (6 migrations)
 - [x] RLS policies enforced
 - [x] Auto-deploy from GitHub
 - [x] Production URL (qrlive.vercel.app)
+- [x] Proxy gateway service scaffold for HTTP/SOCKS5 vendor egress
 
 ### Phase 09: Bypass URL Feature ✅
 - [x] Bypass URL schema validation
@@ -103,6 +107,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Bypass URL in geo route form
 - [x] Redirect priority: bypass_url → target_url → default_url
 - [x] Analytics tracking (bypass or direct)
+- [x] Optional custom short codes (validated + uniqueness checked)
 
 ---
 
@@ -121,22 +126,13 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **Geo route React key** | Non-unique keys (country_code) could cause re-render bugs | Low | Pending |
-| **Component test coverage** | StatsPanel, LinkCard, forms lack tests (0% coverage) | Medium | Pending |
-| **Non-null assertion** | `user!.id` in CreateLinkDialog is unsafe | Low | Pending |
-| **refetchInterval load** | 10s refetch on every tab may overload DB | Low | Pending |
+| **Component test coverage** | StatsPanel, LinkCard, dialogs, QRPreview lack tests | Medium | Pending |
+| **Redirect/proxy test coverage** | Proxy gateway now has smoke coverage; edge redirect paths still rely on manual verification | Medium | Pending |
+| **Analytics pre-aggregation/caching** | Stats panel now uses aggregate RPCs, but higher-volume reporting may still want cached rollups | Medium | Pending |
+| **Large JS bundle** | Production build warns about a large main chunk | Low | Pending |
 
 **Details**:
-1. **Geo route key issue**: Currently uses `country_code` as React key. Should use unique `id` from database to prevent re-render issues during edits.
-   ```typescript
-   // Current (bad):
-   {geoRoutes.map(route => <GeoRouteField key={route.country_code} />)}
-
-   // Should be:
-   {geoRoutes.map(route => <GeoRouteField key={route.id} />)}
-   ```
-
-2. **Component test coverage**: Forms, StatsPanel, LinkCard have no tests. Adding these would improve reliability.
+1. **Component test coverage**: Forms, StatsPanel, LinkCard, and QRPreview still rely on manual QA. Adding component tests would improve confidence in dashboard interactions.
    ```typescript
    // Missing tests:
    - CreateLinkDialog.tsx (form validation, submission)
@@ -146,23 +142,11 @@ None currently blocking.
    - QRPreview.tsx (QR generation)
    ```
 
-3. **Non-null assertion**: In CreateLinkDialog, `user!.id` assumes user is non-null but useAuth() doesn't guarantee it.
-   ```typescript
-   // Current (risky):
-   const userId = user!.id;
+2. **Redirect/proxy test coverage**: `proxy-gateway` now has smoke coverage, but `supabase/functions/redirect`, `supabase/functions/proxy`, and `cloudflare-worker/redirect-proxy.js` still rely on manual verification.
 
-   // Should be:
-   if (!user?.id) {
-     toast.error("Not authenticated");
-     return;
-   }
-   const userId = user.id;
-   ```
+3. **Analytics pre-aggregation/caching**: The dashboard list and stats panel now use aggregate RPCs. Very high-volume or longer-range analytics will eventually want cached rollups or materialized summaries.
 
-4. **refetchInterval load**: `useLinks()` queries every 10s on every tab. Consider:
-   - Reduce to 30s or use `onWindowFocus` instead
-   - Profile database CPU usage
-   - Add connection pooling if needed
+4. **Large JS bundle**: `npm run build` currently emits a Vite chunk-size warning for the main bundle. The biggest candidates for future splitting are analytics/charting and the larger UI helper modules.
 
 ### Low Priority
 - [ ] API documentation (OpenAPI/Swagger)
@@ -176,7 +160,7 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 66% (33/50) | ⚠️ Below target |
+| **Test Coverage** | >80% | ~66% (40 tests passing) | ⚠️ Below target |
 | **Build Time** | <30s | ~10s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
@@ -202,7 +186,6 @@ None currently blocking.
 **Effort**: 1-2 weeks | **Impact**: High (user engagement)
 
 #### 2. Link Management Enhancements
-- [ ] Custom short codes (user-defined, unique constraint)
 - [ ] Link expiration dates (auto-disable after date)
 - [ ] Password protection on links (prompt before redirect)
 - [ ] QR code customization (colors, logo, border)
@@ -257,10 +240,12 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (33 tests)
+### Current Coverage (40 tests)
 - ✅ Schema validation (17 tests)
-- ✅ Database utilities (7 tests)
+- ✅ Database utilities + analytics query helpers (11 tests)
 - ✅ Auth context (8 tests)
+- ✅ Vitest sanity test (1 test)
+- ✅ Proxy gateway smoke tests (3 tests)
 
 ### To Add (before 1.0 release)
 - [ ] Component tests (StatsPanel, LinkCard, dialogs)
@@ -381,7 +366,6 @@ None identified.
 - [ ] >80% test coverage
 - [ ] Component tests added
 - [ ] E2E tests with Playwright
-- [ ] Custom short codes
 - [ ] Link expiration
 - [ ] Advanced analytics
 - [ ] API documentation

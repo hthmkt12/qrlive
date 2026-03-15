@@ -14,10 +14,16 @@ function useInvalidateLinks() {
   return () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.links });
 }
 
+function useInvalidateDashboardAnalytics() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.analytics.all });
+}
+
 // ── Create ──────────────────────────────────────────────────────────────────
 
 export function useCreateLink() {
-  const invalidate = useInvalidateLinks();
+  const invalidateLinks = useInvalidateLinks();
+  const invalidateAnalytics = useInvalidateDashboardAnalytics();
   return useMutation({
     mutationFn: ({
       name,
@@ -32,7 +38,10 @@ export function useCreateLink() {
       userId: string;
       customShortCode?: string;
     }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidateLinks();
+      invalidateAnalytics();
+    },
   });
 }
 
@@ -97,9 +106,13 @@ export function useUpdateGeoRoutes() {
 // ── Delete ───────────────────────────────────────────────────────────────────
 
 export function useDeleteLink() {
-  const invalidate = useInvalidateLinks();
+  const invalidateLinks = useInvalidateLinks();
+  const invalidateAnalytics = useInvalidateDashboardAnalytics();
   return useMutation({
     mutationFn: (id: string) => deleteLinkInDB(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidateLinks();
+      invalidateAnalytics();
+    },
   });
 }

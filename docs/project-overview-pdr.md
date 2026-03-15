@@ -10,7 +10,7 @@
 
 ## Project Goals
 
-1. **Dynamic Link Management** — Users create, edit, toggle, and delete QR links with 6-character short codes
+1. **Dynamic Link Management** — Users create, edit, toggle, and delete QR links with auto-generated 6-character codes or custom 3-20 character short codes
 2. **Geo-Routing** — Route visitors to different URLs by country (15 supported countries)
 3. **Bypass URLs** — Provide alternative URLs to bypass geo-blocking (priority: bypass_url → target_url → default_url)
 4. **Analytics** — Track click events (country, IP, user-agent, referer) with visualization
@@ -32,7 +32,7 @@
 - **Edit**: Update name, default URL, geo routes per link
 - **Delete**: Remove links with CASCADE delete on geo_routes and click_events
 - **Toggle**: Enable/disable links without deletion
-- **Short Code**: Auto-generated 6-char alphanumeric codes (collision retry: 5 attempts)
+- **Short Code**: Auto-generated 6-char alphanumeric codes by default, with optional custom codes using `A-Z`, `0-9`, `_`, `-` (3-20 chars)
 
 ### Geo-Routing (15 Countries)
 Supported: US, GB, JP, KR, DE, FR, VN, TH, SG, AU, CA, BR, IN, CN, RU
@@ -92,7 +92,7 @@ For each country, users set:
 **URL**: `{SUPABASE_URL}/functions/v1/redirect/{shortCode}`
 
 **Flow**:
-1. Validate 6-char alphanumeric short code
+1. Validate short code format `^[A-Z0-9_-]{3,20}$`
 2. Look up active link + geo routes
 3. Geo-detect via `cf-ipcountry` header (Cloudflare)
 4. Bot filter check (skip click for crawlers)
@@ -129,14 +129,14 @@ For each country, users set:
 - [x] Vietnamese UI
 - [x] RLS security policies
 - [x] Rate limiting + bot filtering
-- [x] 33 passing tests
+- [x] 40 passing tests
 - [x] Deployed to Vercel + Supabase
 
 ### Known Issues (Medium Priority)
-1. Geo route React key uses country_code (should use unique id)
-2. `user!.id` non-null assertion in CreateLinkDialog (unsafe)
-3. refetchInterval 10s on every tab (DB load concern)
-4. 0% component test coverage (StatsPanel, LinkCard, forms)
+1. Business components still lack automated tests (`StatsPanel`, `LinkCard`, dialogs, `QRPreview`)
+2. Redirect and proxy flows do not yet have automated tests
+3. Analytics detail now uses aggregate RPCs, but very high-volume or long-range reporting may still want cached rollups
+4. Production build currently emits a large main chunk warning
 
 ---
 
@@ -161,13 +161,12 @@ For each country, users set:
 **Backend**:
 - Supabase project: ybxmpuirarncxmenprzf
 - Edge function deployed with `--no-verify-jwt` flag
-- Migrations applied sequentially (4 migrations total)
+- Migrations applied sequentially (6 migrations total)
 
 ---
 
 ## Future Enhancements
 
-- [ ] Custom short codes (user-defined instead of random)
 - [ ] Link expiration dates
 - [ ] Password protection on links
 - [ ] Bulk import/export
@@ -190,8 +189,10 @@ src/
 ├── hooks/           use-links, use-link-mutations, use-mobile
 ├── lib/             db.ts, schemas.ts, types.ts, query-keys.ts, utils.ts
 ├── integrations/    supabase/client.ts, supabase/types.ts
-└── test/            33 tests (schemas, db-utils, auth-context)
+└── test/            37 tests (schemas, db-utils, auth-context)
 ```
+
+Additional deployment service: `proxy-gateway/` provides the always-on bypass gateway for HTTP/SOCKS5 vendor egress.
 
 ---
 
@@ -200,4 +201,4 @@ src/
 - **Owner**: hthmkt12
 - **Frontend Lead**: Full-stack React + TypeScript
 - **Backend**: Supabase + Deno edge functions
-- **QA**: 33 tests, all passing
+- **QA**: 40 tests total, all passing (including proxy-gateway smoke tests)

@@ -25,8 +25,8 @@
 |--------|-------|
 | **Total Files** | 132 |
 | **Repo Tokens** | ~91K |
-| **Tests** | 33 passing |
-| **Test Coverage** | 66% (schemas, db, auth) |
+| **Tests** | 40 passing |
+| **Test Coverage** | ~66% (app tests + gateway smoke tests) |
 | **Code Files** | ~50 (src/ + supabase/) |
 | **Dependencies** | 24 prod + 13 dev |
 | **Build Time** | ~10s |
@@ -45,14 +45,14 @@ qrlive/
 │   ├── hooks/                 # React hooks (useLinks, useLinkMutations)
 │   ├── lib/                   # Database, schemas, types, utilities
 │   ├── integrations/supabase/ # Supabase client & types
-│   ├── test/                  # 33 unit/integration tests
+│   ├── test/                  # 37 unit/integration tests
 │   ├── App.tsx                # Root component + routing
 │   ├── main.tsx               # Entry point
 │   └── index.css              # Tailwind + global styles
 │
 ├── supabase/
 │   ├── functions/redirect/    # Edge function for redirects
-│   └── migrations/            # 4 database migrations
+│   └── migrations/            # 6 database migrations
 │
 ├── public/                    # Static assets (favicon, robots.txt)
 ├── .claude/                   # Development context files
@@ -66,6 +66,8 @@ qrlive/
 ├── .env.example               # Environment template
 └── README.md                  # Project overview
 ```
+
+Additional service: `proxy-gateway/` contains the always-on bypass gateway for HTTP/SOCKS5 vendor egress.
 
 ---
 
@@ -107,7 +109,10 @@ qrlive/
 ```
 
 ### useLinks() (src/hooks/use-links.ts)
-Fetches all links with relations (geo_routes, click_events).
+Fetches links + geo routes only; analytics are split into separate summary/detail queries.
+
+### useLinkAnalyticsSummaries() / useLinkAnalyticsDetail() (src/hooks/use-links.ts)
+Fetch aggregated dashboard metrics and selected-link analytics detail via Supabase RPCs.
 
 ### useLinkMutations() (src/hooks/use-link-mutations.ts)
 ```typescript
@@ -132,7 +137,7 @@ Detects mobile breakpoint (768px).
 id UUID PRIMARY KEY
 user_id UUID FK → auth.users(id)
 name TEXT
-short_code TEXT UNIQUE  -- 6-char alphanumeric
+short_code TEXT UNIQUE  -- auto-generated 6-char or custom 3-20 chars: [A-Z0-9_-]
 default_url TEXT
 is_active BOOLEAN
 created_at TIMESTAMP
@@ -193,15 +198,17 @@ type AuthInput = z.infer<typeof authSchema>
 
 ### Query Keys (lib/query-keys.ts)
 ```typescript
-links: {
-  all: ["links"],
-  list: () => ["links", "list"],
-  detail: (id) => ["links", "list", { id }],
+links: ["links"]
+link: (id) => ["links", id]
+analytics: {
+  all: ["links", "analytics"],
+  summaries: (linkIds) => ["links", "analytics", "summaries", ...linkIds],
+  detail: (id) => ["links", "analytics", "detail", id],
 }
 ```
 
 ### Mutations Auto-Refetch
-Create/update/delete mutations trigger `queryClient.invalidateQueries(links.all)`.
+Create/update/delete mutations trigger targeted invalidation for `QUERY_KEYS.links` and `QUERY_KEYS.analytics.all`.
 
 ---
 
@@ -212,7 +219,7 @@ Create/update/delete mutations trigger `queryClient.invalidateQueries(links.all)
 **Access**: Service role (bypasses RLS)
 
 **Flow**:
-1. Validate short code (^[A-Z0-9]{6}$)
+1. Validate short code (`^[A-Z0-9_-]{3,20}$`)
 2. Fetch link + geo_routes (service role)
 3. Extract geo data: country (cf-ipcountry), IP, user-agent, referer
 4. Check bot pattern (skip recording for crawlers)
@@ -245,7 +252,7 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 ---
 
-## Testing (33 tests)
+## Testing (40 tests total)
 
 ### Schemas (17 tests)
 - Valid/invalid link forms
@@ -253,11 +260,13 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - URL validation (protocol, format)
 - Geo route validation
 
-### Database (7 tests)
+### Database (11 tests)
 - Fetch links
 - Generate short code (collision)
 - Create/update/delete link
 - Insert geo routes
+- Aggregate analytics summary query
+- Detailed analytics RPC normalization
 
 ### Auth Context (8 tests)
 - Initial loading state
@@ -265,9 +274,18 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - Auth event subscription
 - Sign in/up/out
 
+### App Smoke (1 test)
+- Vitest sanity wiring
+
+### Proxy Gateway (3 tests)
+- Health endpoint
+- Header forwarding + redirect rewriting
+- Config validation + proxy agent selection
+
 **Run Tests**:
 ```bash
 npm run test          # Run once
+npm run gateway:test  # Run proxy-gateway smoke tests
 npm run test:watch   # Watch mode
 ```
 
@@ -406,8 +424,8 @@ supabase functions deploy redirect --no-verify-jwt
 - ✅ Rate limiting (1 click/IP/60s)
 - ✅ Bot filtering (crawlers don't count)
 - ✅ CORS headers on edge function
-- ⚠️ Non-null assertion on `user!.id` (should be optional check)
-- ⚠️ React keys using country_code (should use unique id)
+- ⚠️ Business components still lack automated tests
+- ⚠️ The redirect edge function still relies on manual verification; the proxy gateway now has smoke coverage
 
 ---
 
@@ -415,10 +433,10 @@ supabase functions deploy redirect --no-verify-jwt
 
 | Issue | Severity | Fix Time | Status |
 |-------|----------|----------|--------|
-| React key uses country_code | Low | 10min | Pending |
-| Non-null assertion on user.id | Low | 10min | Pending |
 | 0% component test coverage | Medium | 2-3 hours | Pending |
-| refetchInterval 10s (DB load) | Low | 15min | Pending |
+| Redirect edge paths lack tests | Medium | 2-3 hours | Pending |
+| Long-range analytics pre-aggregation | Medium | 1-2 hours | Pending |
+| Main bundle size warning | Low | 1-2 hours | Pending |
 
 ---
 
@@ -432,6 +450,7 @@ npm run lint            # Lint code
 
 # Testing
 npm run test            # Run tests once
+npm run gateway:test    # Run proxy-gateway smoke tests
 npm run test:watch     # Watch mode
 
 # Building

@@ -68,7 +68,7 @@ react-hook-form validates (zod schema)
 CreateLinkDialog.tsx → useLinkMutations.createLink()
          ↓
 db.ts: createLinkInDB()
-  ├─ generateShortCode() [6-char, collision-safe]
+  ├─ optional customShortCode OR generateShortCode() [6-char fallback]
   ├─ INSERT qr_links
   └─ INSERT geo_routes (if provided)
          ↓
@@ -85,7 +85,7 @@ User clicks QR code (or visits short URL)
 GET /functions/v1/redirect/{shortCode}
          ↓
 Edge Function (redirect/index.ts):
-  ├─ Validate short code format (^[A-Z0-9]{6}$)
+  ├─ Validate short code format (^[A-Z0-9_-]{3,20}$)
   ├─ Fetch link + geo_routes (service role, bypasses RLS)
   ├─ Extract geo info:
   │  ├─ Country from cf-ipcountry header (Cloudflare)
@@ -138,7 +138,7 @@ CREATE TABLE qr_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  short_code TEXT NOT NULL UNIQUE,  -- 6-char alphanumeric
+  short_code TEXT NOT NULL UNIQUE,  -- auto-generated 6-char or custom 3-20 chars
   default_url TEXT NOT NULL,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT now(),
@@ -264,17 +264,19 @@ CREATE POLICY "owner_select" ON click_events
 **Query Key Hierarchy**:
 ```typescript
 // query-keys.ts
-links: {
-  all: ["links"],
-  list: () => ["links", "list"],
-  detail: (id) => ["links", "list", { id }],
+links: ["links"]
+link: (id) => ["links", id]
+analytics: {
+  all: ["links", "analytics"],
+  summaries: (linkIds) => ["links", "analytics", "summaries", ...linkIds],
+  detail: (id) => ["links", "analytics", "detail", id],
 }
 ```
 
 **Hooks**:
-- `useLinks()` — Fetch all links with relations (geo_routes, click_events)
-  - Auto-refetch every 10s (concern: DB load)
-  - Cache time: 0 (fresh on every tab focus)
+- `useLinks()` — Fetch links + geo_routes only
+- `useLinkAnalyticsSummaries()` — Fetch aggregate totals for dashboard cards and link cards
+- `useLinkAnalyticsDetail()` — Fetch aggregate 7-day/country/referer detail for the selected link
 - `useLinkMutations()` — Create/update/delete mutations with automatic refetch
 
 ---
@@ -356,18 +358,32 @@ if (!BOT_PATTERN.test(userAgent)) {
 ```
 
 **Security Checks**:
-- Short code format: `^[A-Z0-9]{6}$` (exact match, case-sensitive)
+- Short code format: `^[A-Z0-9_-]{3,20}$` (uppercase, exact match)
 - Redirect target protocol: `^https?://` (block javascript:, data:)
 - Response headers: `Cache-Control: no-store`, `X-Robots-Tag: noindex`
 
 ---
+
+### Optional Proxy Gateway (Bypass URL Delivery)
+
+```
+CN user
+  â†’ Cloudflare Worker / redirect domain
+    â†’ Supabase redirect function
+      â†’ bypass_url = https://jp.yourdomain.com/page
+        â†’ proxy-gateway (always-on Node service)
+          â†’ outbound HTTP/SOCKS5 proxy vendor
+            â†’ origin site
+```
+
+The gateway keeps `bypass_url` as a normal HTTPS URL for browsers while moving the actual proxy logic to server-side code.
 
 ## Performance & Optimization
 
 | Area | Strategy | Result |
 |------|----------|--------|
 | **Redirect Latency** | Edge function (Deno, runs on Cloudflare) | <100ms |
-| **React Query** | Refetch on tab focus, 10s interval | Data freshness |
+| **React Query** | 30s staleTime + invalidation on mutations | Data freshness |
 | **Component Rendering** | React Query cache + Framer Motion | Smooth animations |
 | **Database** | Postgres indexes on user_id, short_code | Fast lookups |
 | **UI State** | Loading skeletons on LinkCard | No layout shift |
@@ -422,6 +438,8 @@ All responses include CORS headers for browser access.
 | Auth + RLS | 2026-03-15 | Add user_id FK, RLS policies |
 | Bypass URL | 2026-03-15 | Add bypass_url column to geo_routes |
 | Atomic geo update | 2026-03-16 | Add upsert_geo_routes() RPC function |
+| Analytics summaries RPC | 2026-03-16 | Add get_link_click_summaries(uuid[]) aggregate function |
+| Analytics detail RPC | 2026-03-16 | Add get_link_click_detail(uuid) aggregate function |
 
 ---
 
