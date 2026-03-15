@@ -171,11 +171,11 @@ Chinese users are redirected to the Japan proxy, which forwards to the actual co
 
 ## Success Criteria
 
-- [ ] `docs/deployment-guide.md` updated with Japan proxy section
-- [ ] Step-by-step guide covers full flow from VPS setup to QRLive config
-- [ ] Limitations documented honestly
-- [ ] Config templates provided for common use cases
-- [ ] Comparison table helps user choose between Phase 1 and Phase 2
+- [x] `docs/deployment-guide.md` updated — Fly.io deploy steps corrected (flyctl workflow, direct mode, HEALTH_REVEAL_UPSTREAM note)
+- [x] Step-by-step guide covers full flow from app create to QRLive bypass_url config
+- [x] Limitations documented honestly (SPAs, third-party sites)
+- [x] Config templates for common use cases (landing page, file server, API, marketing site)
+- [x] Comparison table helps user choose Phase 1 vs Phase 2
 
 ## Security Note: bypass_url Domain Restriction [F11]
 

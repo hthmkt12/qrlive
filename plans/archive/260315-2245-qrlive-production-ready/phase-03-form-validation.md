@@ -28,8 +28,8 @@ File: `src/components/EditLinkDialog.tsx`
 
 ### TASK-15: Fix short code collision
 File: `src/lib/db.ts`
-- [ ] ~~Tạo helper `generateUniqueShortCode(supabase)` — thử insert, nếu bị unique violation thì retry tối đa 5 lần với code mới~~
-- [ ] **[RED TEAM #6 — High] MANDATE server-side approach only.** Client-side retry is a TOCTOU race: two concurrent clients generate the same code, both check SELECT (both see empty), both INSERT → one fails after all retries. Use a Postgres function:
+<!-- Updated: Validation Session 1 - Server-side Postgres function mandated, client retry removed -->
+- [ ] **[VALIDATED — server-side only]** Client-side retry removed entirely. Use Postgres function as column DEFAULT: Client-side retry is a TOCTOU race: two concurrent clients generate the same code, both check SELECT (both see empty), both INSERT → one fails after all retries. Use a Postgres function:
   ```sql
   CREATE OR REPLACE FUNCTION generate_short_code() RETURNS TEXT AS $$
   DECLARE

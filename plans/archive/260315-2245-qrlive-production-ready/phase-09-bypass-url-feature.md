@@ -1,6 +1,9 @@
 # Phase 09 — Bypass URL Feature
 
-**Priority:** 🟠 High | **Status:** Todo
+**Priority:** 🟠 High | **Status:** ⏸ DEFERRED to v2
+
+<!-- Updated: Validation Session 1 - Phase 09 deferred to v2 per user decision -->
+> **[VALIDATION DECISION]** Phase 09 deferred to v2. Ship Phases 01-08 first. bypass_url adds schema+edge fn+UI complexity before core is validated in production. Re-evaluate after first production release.
 
 > ⚠️ **[RED TEAM #5 — Critical] SCOPE CREEP WARNING:** This phase adds schema migration + edge function change + 4 UI components before core (Phases 01-08) is validated in production. Recommend deferring to v2. Phases 01+02+05+08 constitute a shippable MVP. Phase 09 introduces a 3rd URL-tier override that adds complexity before there are production users to need it. **Decision required:** defer or proceed with awareness of increased failure surface.
 

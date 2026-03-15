@@ -41,9 +41,9 @@ CN user scans QR
 
 | # | Phase | File | Status | Effort |
 |---|-------|------|--------|--------|
-| 1 | Deploy proxy-gateway to Fly.io Tokyo | [phase-01-vps-nginx.md](./phase-01-vps-nginx.md) | Pending | 1h |
+| 1 | Deploy proxy-gateway to Fly.io Tokyo | [phase-01-vps-nginx.md](./phase-01-vps-nginx.md) | In Progress (code ready, awaiting flyctl deploy) | 1h |
 | 2 | Supabase Edge Function proxy (optional) | [phase-02-supabase-proxy-edge.md](./phase-02-supabase-proxy-edge.md) | Pending | 2h |
-| 3 | Integration guide & docs | [phase-03-integration-guide.md](./phase-03-integration-guide.md) | Pending | 1h |
+| 3 | Integration guide & docs | [phase-03-integration-guide.md](./phase-03-integration-guide.md) | Complete | 1h |
 
 ## Recommendation
 

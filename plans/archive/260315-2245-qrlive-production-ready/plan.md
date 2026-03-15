@@ -19,7 +19,7 @@ QRLive là dynamic QR code + link shortener với geo-routing và click analytic
 | 6 | [UI/UX Polish](./phase-06-ui-ux-polish.md) | 🟡 Medium | 27–33 | Todo |
 | 7 | [Testing](./phase-07-testing.md) | 🟡 Medium | 34–39 | Todo |
 | 8 | [Deployment](./phase-08-deployment.md) | 🔴 Critical | 40–46 | Todo |
-| 9 | [Bypass URL Feature](./phase-09-bypass-url-feature.md) | 🟠 High | 47–54 | Todo |
+| 9 | [Bypass URL Feature](./phase-09-bypass-url-feature.md) | 🟠 High | 47–54 | ⏸ Deferred v2 |
 
 **Total: 54 tasks**
 
@@ -108,6 +108,61 @@ Phase 01 → Phase 02 → Phase 08 (TASK-40–42) → Phase 03 → Phase 04 → 
 ```
 
 Phase 01 + 02 + deploy Supabase trước để có auth foundation. Sau đó implement features. Test cuối cùng trước deploy frontend.
+
+---
+
+## Validation Log
+
+### Session 1 — 2026-03-16
+**Trigger:** Post red-team review validation interview
+**Questions asked:** 5
+
+#### Questions & Answers
+
+1. **[Assumptions]** Is the Supabase project greenfield (no existing data), or does it have prior qr_links rows?
+   - Options: Greenfield | Has existing data | Not sure
+   - **Answer:** Greenfield — no prior data
+   - **Rationale:** Red Team Finding #3 (orphaned rows) is moot. Migration can safely add `NOT NULL user_id` without backfill.
+
+2. **[Scope]** Should Phase 09 (bypass_url) be deferred to v2, or kept in scope?
+   - Options: Defer to v2 | Keep in scope | Keep but deprioritize
+   - **Answer:** Defer to v2
+   - **Rationale:** Reduces release scope to 8 phases. Phase 09 adds schema+edge fn+UI complexity before core is validated.
+
+3. **[Architecture]** For click_events INSERT: service role only, or keep public INSERT policy?
+   - Options: Service role only | Keep public INSERT | Keep both during transition
+   - **Answer:** Service role only — remove public INSERT policy
+   - **Rationale:** Public INSERT policy allows any client to poison analytics via direct REST API. Edge function uses service role — policy is redundant and dangerous.
+
+4. **[Risks]** Where should E2E tests (Playwright) run against?
+   - Options: Local Supabase | Staging project | Production
+   - **Answer:** Local Supabase (supabase start)
+   - **Rationale:** Isolated environment. No production risk. Requires Docker but prevents test data contamination.
+
+5. **[Architecture]** Short code generation approach?
+   - Options: Server-side Postgres function only | Client-side retry | Both
+   - **Answer:** Server-side Postgres function only
+   - **Rationale:** Atomic generation, no TOCTOU race. Set as column DEFAULT. Client never sends short_code.
+
+#### Confirmed Decisions
+- **Greenfield deploy** — no backfill needed; add `NOT NULL` directly in migration
+- **Phase 09 deferred** — remove from current release; priority is Phases 01-08
+- **click_events RLS** — service role only; remove `public_insert_clicks` policy
+- **E2E environment** — local Supabase via `supabase start`; Docker required
+- **Short code** — Postgres function as column DEFAULT; mandated server-side
+
+#### Action Items
+- [ ] Phase 02: Add `NOT NULL` to `user_id` column directly; remove orphaned row handling
+- [ ] Phase 02: Remove `public_insert_clicks` policy from migration
+- [ ] Phase 03: Remove client-side retry entirely; mandate Postgres function
+- [ ] Phase 07: Add Docker prerequisite + local Supabase setup instructions
+- [ ] Phase 09: Mark as **DEFERRED to v2**, update phase status
+
+#### Impact on Phases
+- Phase 02: Migration simplified (greenfield) + click_events policy removed
+- Phase 03: TASK-15 is now purely server-side Postgres function
+- Phase 07: TASK-38 requires local Supabase setup steps
+- Phase 09: Entire phase deferred — status → Deferred
 
 ---
 

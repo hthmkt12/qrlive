@@ -22,13 +22,33 @@ async function stopServer(server) {
   });
 }
 
-test("health endpoint reports direct mode", async (t) => {
+test("health endpoint reports direct mode, hides upstreamOrigin by default (F13)", async (t) => {
   const gateway = createProxyGatewayServer({
     port: 0,
     requestTimeoutMs: 1_000,
     maxRedirects: 0,
     upstreamOrigin: new URL("https://example.com"),
     outboundProxyUrl: null,
+    healthRevealUpstream: false,
+  });
+
+  t.after(() => stopServer(gateway));
+
+  const gatewayBaseUrl = await startServer(gateway);
+  const response = await fetch(`${gatewayBaseUrl}/health`);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "ok", proxyMode: "direct" });
+});
+
+test("health endpoint reveals upstreamOrigin when HEALTH_REVEAL_UPSTREAM=true", async (t) => {
+  const gateway = createProxyGatewayServer({
+    port: 0,
+    requestTimeoutMs: 1_000,
+    maxRedirects: 0,
+    upstreamOrigin: new URL("https://example.com"),
+    outboundProxyUrl: null,
+    healthRevealUpstream: true,
   });
 
   t.after(() => stopServer(gateway));

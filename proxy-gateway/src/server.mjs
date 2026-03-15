@@ -92,11 +92,10 @@ export function createProxyGatewayServer(config = loadConfig()) {
     const requestUrl = new URL(req.url ?? "/", config.upstreamOrigin);
 
     if (requestUrl.pathname === "/health") {
-      return json(res, 200, {
-        status: "ok",
-        proxyMode: agents.proxyLabel,
-        upstreamOrigin: config.upstreamOrigin.origin,
-      });
+      // F13: only reveal upstreamOrigin if HEALTH_REVEAL_UPSTREAM=true (prevents GFW fingerprinting)
+      const payload = { status: "ok", proxyMode: agents.proxyLabel };
+      if (config.healthRevealUpstream) payload.upstreamOrigin = config.upstreamOrigin.origin;
+      return json(res, 200, payload);
     }
 
     try {

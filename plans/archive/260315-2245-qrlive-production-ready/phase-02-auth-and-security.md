@@ -11,10 +11,11 @@ Hiện tại app hoàn toàn public — bất kỳ ai cũng có thể xóa/sửa
 - [ ] Enable Email Auth trong Supabase dashboard (hoặc qua `supabase/config.toml`)
 - [ ] Tạo migration mới: thêm `user_id UUID REFERENCES auth.users(id)` vào `qr_links`
   ```sql
-  ALTER TABLE qr_links ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+  ALTER TABLE qr_links ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL;
   ```
+<!-- Updated: Validation Session 1 - Greenfield confirmed, NOT NULL safe, no backfill needed -->
 
-> ⚠️ **[RED TEAM #3 — Critical]** Existing rows will have `user_id = NULL`. RLS `USING (auth.uid() = user_id)` returns FALSE for NULLs → all pre-existing links become invisible and unmanageable (links still redirect via service role, but users cannot edit/delete). **Fix:** If greenfield, document it explicitly. If not, add a backfill step: assign orphaned rows to an admin user or use `NOT NULL` only after backfill. Add to migration:
+> ~~⚠️ **[RED TEAM #3 — Critical]**~~ **[RESOLVED by Validation]** Project is greenfield — no prior data. `NOT NULL` added directly. No backfill required. Existing rows will have `user_id = NULL`. RLS `USING (auth.uid() = user_id)` returns FALSE for NULLs → all pre-existing links become invisible and unmanageable (links still redirect via service role, but users cannot edit/delete). **Fix:** If greenfield, document it explicitly. If not, add a backfill step: assign orphaned rows to an admin user or use `NOT NULL` only after backfill. Add to migration:
 > ```sql
 > -- Option A (greenfield): assert no prior data
 > -- Option B: backfill to a designated admin user_id before adding NOT NULL
@@ -46,12 +47,11 @@ File: new migration `supabase/migrations/YYYYMMDD_rls_auth.sql`
   > ```
 - [ ] `click_events`: insert public (edge fn cần insert), select chỉ owner
   ```sql
-  -- Edge function insert không cần auth (service role hoặc public)
-  CREATE POLICY "public_insert_clicks" ON click_events FOR INSERT WITH CHECK (true);
-  -- ⚠️ [RED TEAM #4 — Critical] CONTRADICTION with TASK-26: if the edge fn uses service role (bypasses RLS),
-  -- this public INSERT policy is redundant AND dangerous — any unauthenticated client can poison analytics.
-  -- Decision required: use service role in edge fn (preferred) and remove this public policy, OR keep public
-  -- policy and don't use service role for click inserts. Cannot do both safely.
+  -- [VALIDATION DECISION] Service role only — public_insert_clicks policy REMOVED.
+  -- Edge function uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS.
+  -- Public INSERT would allow any client to poison analytics via direct REST API.
+  -- DO NOT add public_insert_clicks policy.
+<!-- Updated: Validation Session 1 - Removed public_insert_clicks per service-role-only decision -->
   -- Chỉ owner xem analytics
   CREATE POLICY "owner_select_clicks" ON click_events FOR SELECT
     USING (EXISTS (SELECT 1 FROM qr_links WHERE qr_links.id = click_events.link_id AND qr_links.user_id = auth.uid()));

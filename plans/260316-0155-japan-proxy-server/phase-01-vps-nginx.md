@@ -110,11 +110,13 @@ Set `bypass_url` to `https://qrlive-jp-proxy-site2.fly.dev/path` for the second 
 
 ## Success Criteria
 
-- [ ] `fly.toml` created from example with unique app name
-- [ ] Fly.io app created in Tokyo (`nrt`)
-- [ ] `UPSTREAM_ORIGIN` secret set
+- [x] `fly.toml` created from example with unique app name (`qrlive-jp-proxy`, nrt)
+- [x] F10 fixed: explicit `rejectUnauthorized: true` on httpsAgent (`proxy-agent.mjs`)
+- [x] F13 fixed: `/health` hides `upstreamOrigin` by default; `HEALTH_REVEAL_UPSTREAM=true` to reveal
+- [ ] Fly.io app created in Tokyo (`nrt`) — `flyctl apps create qrlive-jp-proxy --machines`
+- [ ] `UPSTREAM_ORIGIN` secret set — `flyctl secrets set UPSTREAM_ORIGIN=https://... --app qrlive-jp-proxy`
 - [ ] `flyctl deploy` succeeds
-- [ ] `/health` returns `{"status":"ok","proxyMode":"direct",...}`
+- [ ] `/health` returns `{"status":"ok","proxyMode":"direct"}`
 - [ ] Proxied response matches origin response
 - [ ] QRLive bypass_url redirect works end-to-end
 

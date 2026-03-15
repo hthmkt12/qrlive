@@ -63,5 +63,7 @@ export function loadConfig(env = process.env) {
     maxRedirects: readInteger(env, "MAX_REDIRECTS", DEFAULT_MAX_REDIRECTS),
     upstreamOrigin,
     outboundProxyUrl,
+    // F13: hide upstreamOrigin from /health to avoid GFW scanner fingerprinting (default: hidden)
+    healthRevealUpstream: (env.HEALTH_REVEAL_UPSTREAM ?? "false").toLowerCase() === "true",
   };
 }

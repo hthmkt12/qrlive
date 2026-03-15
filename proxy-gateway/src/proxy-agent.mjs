@@ -1,3 +1,4 @@
+import { Agent as NodeHttpsAgent } from "node:https";
 import { HttpProxyAgent } from "http-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { SocksProxyAgent } from "socks-proxy-agent";
@@ -6,7 +7,8 @@ export function createUpstreamAgents(proxyUrl) {
   if (!proxyUrl) {
     return {
       httpAgent: undefined,
-      httpsAgent: undefined,
+      // F10: explicit rejectUnauthorized=true prevents DNS-hijack / MITM on upstream TLS
+      httpsAgent: new NodeHttpsAgent({ rejectUnauthorized: true }),
       proxyLabel: "direct",
     };
   }

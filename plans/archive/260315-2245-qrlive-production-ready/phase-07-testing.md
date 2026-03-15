@@ -35,8 +35,21 @@ File: `src/test/create-link-dialog.test.tsx`
 
 ### TASK-38: E2E test — happy path (Playwright)
 File: `src/test/e2e/create-and-redirect.spec.ts`
+<!-- Updated: Validation Session 1 - Local Supabase confirmed for E2E environment -->
+**E2E Environment: Local Supabase via `supabase start` (Docker required)**
 
-> ⚠️ **[RED TEAM #7 — High]** "Login với test account" — no environment defined, no credentials source, no test isolation. Without a separate Supabase project for testing, this runs against production: creates real links, generates real analytics, cleanup failures leave permanent artifacts. **Fix:**
+**Prerequisites:**
+```bash
+supabase start  # starts local Postgres + edge functions + auth
+# Set in .env.test:
+# PLAYWRIGHT_TEST_BASE_URL=http://localhost:5173
+# VITE_SUPABASE_URL=http://localhost:54321
+# VITE_SUPABASE_ANON_KEY=<local-anon-key from supabase start output>
+# PLAYWRIGHT_TEST_EMAIL=test@example.com
+# PLAYWRIGHT_TEST_PASSWORD=testpassword123
+```
+
+> ~~⚠️ **[RED TEAM #7 — High]**~~ **[RESOLVED by Validation]** Local Supabase chosen — no production risk. "Login với test account" — no environment defined, no credentials source, no test isolation. Without a separate Supabase project for testing, this runs against production: creates real links, generates real analytics, cleanup failures leave permanent artifacts. **Fix:**
 > - Use `supabase start` (local Supabase) for E2E, set `PLAYWRIGHT_TEST_BASE_URL=http://localhost:5173` and `VITE_SUPABASE_URL=http://localhost:54321` in `.env.test`
 > - Store test credentials in `PLAYWRIGHT_TEST_EMAIL` / `PLAYWRIGHT_TEST_PASSWORD` env vars, documented in `.env.example`
 > - Add `afterEach` cleanup that deletes all links created by the test user
