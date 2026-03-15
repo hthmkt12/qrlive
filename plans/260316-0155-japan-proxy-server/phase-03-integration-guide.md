@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Integration Guide & Documentation"
-status: pending
+status: done
 priority: P2
 effort: 1h
 ---
@@ -48,75 +48,67 @@ QRLive redirect edge function (line 86-96):
 
 ## Approach Comparison
 
-| Criteria | Phase 1: Japan VPS nginx | Phase 2: Supabase Edge Proxy |
-|----------|-------------------------|------------------------------|
+| Criteria | Phase 1: proxy-gateway on Fly.io | Phase 2: Supabase Edge Proxy |
+|----------|----------------------------------|------------------------------|
 | **Reliability from China** | High (Japan IP, not blocked) | Low (Supabase may be blocked) |
-| **Setup complexity** | Medium (VPS + Docker) | Low (deploy edge function) |
-| **Monthly cost** | $5-6/mo (VPS) | Free tier / usage-based |
-| **Max content size** | Unlimited | 6MB |
-| **SSL** | Let's Encrypt (auto) | Supabase handles |
-| **Custom domain** | Yes (jp.company.com) | No (supabase.co domain) |
+| **Setup complexity** | Low (flyctl deploy, ~1h) | Low (deploy edge function) |
+| **Monthly cost** | Free tier / Hobby $5/mo | Free tier / usage-based |
+| **Max content size** | Unlimited (stream) | 6MB |
+| **SSL** | Fly.io auto TLS | Supabase handles |
+| **Custom domain** | Yes (custom via Fly.io certs) | No (supabase.co domain) |
 | **SPA support** | Partial (if API also proxied) | No |
-| **File downloads** | Yes (large files OK) | Limited (6MB) |
-| **Maintenance** | VPS updates, cert renewal | None |
+| **File downloads** | Yes (streamed via pipeline) | Limited (6MB) |
+| **Maintenance** | Minimal (Fly.io managed infra) | None |
 | **Recommended for** | Production use | Quick testing only |
 
-**Verdict:** Phase 1 (Japan VPS) for production. Phase 2 only for proof-of-concept.
+**Verdict:** Phase 1 (proxy-gateway on Fly.io) for production. Phase 2 only for proof-of-concept.
 
-## nginx Config Templates for Common Use Cases
+## Fly.io Deployment Patterns for Common Use Cases
+<!-- Updated: Validation Session 2 - nginx templates removed; replaced with proxy-gateway Fly.io deployment commands -->
+
+Each use case = one Fly.io app with `UPSTREAM_ORIGIN` set to the target server.
 
 ### 1. Simple Landing Page
 
-```nginx
-location / {
-    proxy_pass https://www.company.com;
-    proxy_set_header Host www.company.com;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
+```bash
+flyctl apps create qrlive-jp-landing --machines
+flyctl secrets set UPSTREAM_ORIGIN=https://www.company.com --app qrlive-jp-landing
+flyctl deploy --app qrlive-jp-landing --config proxy-gateway/fly.toml
 ```
 
-bypass_url: `https://jp.company.com/landing-page`
+bypass_url: `https://qrlive-jp-landing.fly.dev/landing-page`
 
 ### 2. File Download Server
 
-```nginx
-location /downloads/ {
-    proxy_pass https://files.company.com/downloads/;
-    proxy_set_header Host files.company.com;
-    proxy_buffering off;  # Stream large files
-    proxy_read_timeout 300s;  # Allow slow downloads
-}
+```bash
+flyctl apps create qrlive-jp-files --machines
+flyctl secrets set UPSTREAM_ORIGIN=https://files.company.com --app qrlive-jp-files
+# For large files, set longer timeout:
+flyctl secrets set REQUEST_TIMEOUT_MS=300000 --app qrlive-jp-files
+flyctl deploy --app qrlive-jp-files --config proxy-gateway/fly.toml
 ```
 
-bypass_url: `https://jp.company.com/downloads/file.pdf`
+bypass_url: `https://qrlive-jp-files.fly.dev/downloads/file.pdf`
 
 ### 3. Multi-Page Marketing Site
 
-```nginx
-location / {
-    proxy_pass https://marketing.company.com;
-    proxy_set_header Host marketing.company.com;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-    # Rewrite redirects from origin to proxy domain
-    proxy_redirect https://marketing.company.com https://jp-marketing.company.com;
-}
+```bash
+flyctl apps create qrlive-jp-marketing --machines
+flyctl secrets set UPSTREAM_ORIGIN=https://marketing.company.com --app qrlive-jp-marketing
+flyctl deploy --app qrlive-jp-marketing --config proxy-gateway/fly.toml
 ```
 
-bypass_url: `https://jp-marketing.company.com/campaign`
+bypass_url: `https://qrlive-jp-marketing.fly.dev/campaign`
 
 ### 4. API Endpoint (JSON)
 
-```nginx
-location /api/ {
-    proxy_pass https://api.company.com/;
-    proxy_set_header Host api.company.com;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header Accept application/json;
-}
+```bash
+flyctl apps create qrlive-jp-api --machines
+flyctl secrets set UPSTREAM_ORIGIN=https://api.company.com --app qrlive-jp-api
+flyctl deploy --app qrlive-jp-api --config proxy-gateway/fly.toml
 ```
+
+bypass_url: `https://qrlive-jp-api.fly.dev/api/endpoint`
 
 ## What Does NOT Work (Document Honestly)
 
@@ -173,8 +165,9 @@ Chinese users are redirected to the Japan proxy, which forwards to the actual co
 ## Implementation Steps
 
 1. Add Japan proxy section to `docs/deployment-guide.md`
-2. Verify all links in plan files are correct
-3. Test documentation accuracy against actual deployment
+2. Update references from nginx config to `proxy-gateway/` Fly.io approach
+3. Verify all links in plan files are correct
+4. Test documentation accuracy against actual deployment
 
 ## Success Criteria
 

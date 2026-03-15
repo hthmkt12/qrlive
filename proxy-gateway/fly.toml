@@ -1,0 +1,36 @@
+# Fly.io deployment config for QRLive proxy-gateway
+# Deploy: flyctl deploy --app qrlive-jp-proxy
+#
+# Before deploying:
+#   1. Change `app` to a unique name (must be globally unique on Fly.io)
+#   2. flyctl auth login
+#   3. flyctl apps create qrlive-jp-proxy --machines
+#   4. flyctl secrets set UPSTREAM_ORIGIN=https://www.yoursite.com --app qrlive-jp-proxy
+#   5. flyctl deploy --app qrlive-jp-proxy
+#
+# GFW block recovery: switch region to hkg
+#   flyctl regions set hkg --app qrlive-jp-proxy && flyctl deploy --app qrlive-jp-proxy
+
+app = "qrlive-jp-proxy"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"

@@ -630,7 +630,8 @@ curl -sf https://jp.company.com/health
 2. Add CN (China) row:
    - **Target URL**: `https://www.company.com/page` (original)
    - **Bypass URL**: `https://jp.company.com/page` (Japan proxy)
-3. Save → test with `curl -H "cf-ipcountry: CN"` against redirect function
+3. Save → test end-to-end using a real CN VPN or China-based device.
+   > ⚠️ **Do NOT use `curl -H "cf-ipcountry: CN"`** as a production test — it bypasses the Cloudflare Worker entirely and tests a shortcut that skips geo-routing.
 
 ### Alternative: Supabase Edge Function Proxy (Zero-Infra, Testing Only)
 
@@ -718,7 +719,8 @@ fly deploy
 2. Add CN (China) row:
    - **Target URL**: `https://www.company.com/page`
    - **Bypass URL**: `https://jp.company.com/page`
-3. Save → test with `curl -H "cf-ipcountry: CN"` against redirect function
+3. Save → test end-to-end using a real CN VPN or China-based device.
+   > ⚠️ **Do NOT use `curl -H "cf-ipcountry: CN"`** — it bypasses the Cloudflare Worker and does not reflect real geo-routing behavior.
 
 ### Legacy alternative
 
