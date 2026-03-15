@@ -540,7 +540,7 @@ Proxy **phải forward `cf-ipcountry` header** để geo-routing tiếp tục ho
 ### Option A: Cloudflare Workers (miễn phí, không guaranteed ở TQ ~70%)
 
 ```bash
-# 1. Sửa SUPABASE_REDIRECT_URL trong cloudflare-worker/redirect-proxy.js
+# 1. Edit cloudflare-worker/redirect-proxy.js — set env var SUPABASE_REDIRECT_URL
 # 2. Deploy
 npm install -g wrangler
 wrangler login
@@ -548,9 +548,15 @@ wrangler deploy cloudflare-worker/redirect-proxy.js \
   --name qrlive-redirect \
   --route "r.yourdomain.com/*"
 
-# 3. Set env var trong Vercel
+# 3. Set secrets in Wrangler
+wrangler secret put SUPABASE_REDIRECT_URL
+# Paste: https://ybxmpuirarncxmenprzf.supabase.co/functions/v1/redirect
+
+# 4. Set env var trong Vercel
 VITE_REDIRECT_BASE_URL=https://r.yourdomain.com
 ```
+
+**Note**: Cloudflare Worker hardcoded redirect URL removed; now uses `env.SUPABASE_REDIRECT_URL` for flexibility.
 
 ### Option B: Alibaba Cloud Function Compute (100% accessible từ TQ)
 

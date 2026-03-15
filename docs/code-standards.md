@@ -241,6 +241,21 @@ function CreateLinkDialog() {
 
 ## Validation Patterns
 
+### Short Code Format Contract
+
+**Auto-generated**: `^[A-Z0-9]{6}$` (6 uppercase alphanumeric)
+**Custom (if provided)**: `^[A-Z0-9_-]{3,20}$` (3-20 chars: uppercase, digits, underscore, hyphen)
+
+**Enforcement**:
+1. **Frontend**: Zod schema in `linkFormSchema` validates customShortCode format
+2. **Backend (db.ts)**: Regex validation in `createLinkInDB()` before INSERT
+3. **Database**: UNIQUE constraint on short_code, collision detect via try-catch
+4. **Edge function**: Validates short code format before lookup
+
+**Error Handling**:
+- Invalid custom code format → `INVALID_SHORT_CODE_FORMAT` error (Vietnamese: "Mã code không hợp lệ")
+- Collision on INSERT → catch error, suggest retry or auto-generate
+
 ### Zod Schemas (lib/schemas.ts)
 
 All schemas are centralized in `lib/schemas.ts` with Vietnamese error messages:
@@ -259,10 +274,14 @@ export const geoRouteSchema = z.object({
   ]).optional(),
 });
 
-// Link form (create/edit)
+// Link form (create/edit) — supports auto or custom short code
 export const linkFormSchema = z.object({
   name: z.string().min(1, "Tên không được để trống").max(100, "Tên quá dài"),
   defaultUrl: z.string().url("URL mặc định không hợp lệ"),
+  customShortCode: z.union([
+    z.string().regex(/^[A-Z0-9_-]{3,20}$/, "Mã code không hợp lệ"),
+    z.literal(""),
+  ]).optional(), // Empty string = auto-generate
   geoRoutes: z.array(geoRouteSchema).default([]),
 });
 
@@ -317,7 +336,7 @@ export async function fetchLinks(): Promise<QRLinkRow[]> {
 }
 ```
 
-**Insert with Error Handling**:
+**Insert with Error Handling & Short Code Validation**:
 ```typescript
 export async function createLinkInDB(
   name: string,
@@ -326,7 +345,15 @@ export async function createLinkInDB(
   userId: string,
   customShortCode?: string
 ): Promise<QRLinkRow> {
-  const shortCode = customShortCode || await generateShortCode(); // Optional custom code, else collision-safe
+  // Validate custom short code format
+  if (customShortCode) {
+    const customCodeRegex = /^[A-Z0-9_-]{3,20}$/;
+    if (!customCodeRegex.test(customShortCode)) {
+      throw new Error("INVALID_SHORT_CODE_FORMAT");
+    }
+  }
+
+  const shortCode = customShortCode || await generateShortCode(); // Auto-gen: ^[A-Z0-9]{6}$
 
   const { data: link, error } = await supabase
     .from("qr_links")
@@ -334,9 +361,15 @@ export async function createLinkInDB(
     .select()
     .single();
 
-  if (error || !link) throw error || new Error("Failed to create link");
+  if (error) {
+    if (error.code === "23505") { // Unique constraint violation
+      throw new Error("DUPLICATE_SHORT_CODE");
+    }
+    throw error;
+  }
+  if (!link) throw new Error("Failed to create link");
 
-  // Insert geo routes
+  // Insert geo routes with error handling
   if (geoRoutes.length > 0) {
     const routes = geoRoutes
       .filter((r) => r.countryCode && r.targetUrl)
@@ -349,7 +382,8 @@ export async function createLinkInDB(
       }));
 
     if (routes.length > 0) {
-      await supabase.from("geo_routes").insert(routes);
+      const { error: routeError } = await supabase.from("geo_routes").insert(routes);
+      if (routeError) throw routeError;
     }
   }
 
@@ -448,7 +482,7 @@ describe("AuthProvider", () => {
 
 ## Error Handling
 
-### Try-Catch in Mutations
+### Try-Catch in Mutations (with Short Code Error Handling)
 
 ```typescript
 async function handleCreateLink(data: LinkFormInput) {
@@ -457,7 +491,15 @@ async function handleCreateLink(data: LinkFormInput) {
     toast.success("Link created successfully");
     form.reset();
   } catch (error) {
-    toast.error(`Failed to create link: ${error.message}`);
+    if (error.message === "INVALID_SHORT_CODE_FORMAT") {
+      toast.error("Mã code không hợp lệ (3-20 ký tự: A-Z, 0-9, _, -)");
+      form.setError("customShortCode", { message: "Định dạng mã không đúng" });
+    } else if (error.message === "DUPLICATE_SHORT_CODE") {
+      toast.error("Mã code đã tồn tại, vui lòng chọn mã khác");
+      form.setError("customShortCode", { message: "Mã code đã được sử dụng" });
+    } else {
+      toast.error(`Failed to create link: ${error.message}`);
+    }
   }
 }
 ```

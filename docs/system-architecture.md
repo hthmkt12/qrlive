@@ -181,14 +181,13 @@ CREATE TABLE click_events (
   country_code TEXT,
   ip_address TEXT,
   user_agent TEXT,
-  referer TEXT,
+  referer TEXT (≤500 chars),
   created_at TIMESTAMP DEFAULT now()
 );
 
--- RLS: Public INSERT (via edge function service role)
+-- RLS: Service role INSERT only (via edge function)
 -- RLS: Owner SELECT (user_id derived from link_id)
-CREATE POLICY "allow_public_insert" ON click_events
-  FOR INSERT WITH CHECK (true);
+-- NOTE: Dropped click_events_insert_public policy — anon clients cannot INSERT
 CREATE POLICY "owner_select" ON click_events
   FOR SELECT USING (
     EXISTS (
@@ -226,7 +225,7 @@ CREATE POLICY "owner_select" ON click_events
 
 **Edge Function Exception**: Uses `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS for:
 - Fetching qr_links by short_code (public lookup needed)
-- Inserting click_events (anonymous redirect needs write access)
+- Inserting click_events (anonymous redirect needs write access, anon client cannot INSERT anymore)
 
 ---
 
@@ -322,7 +321,7 @@ All error messages are in Vietnamese.
 - `cf-ipcountry` — Cloudflare geo-detection (e.g., "US")
 - `x-forwarded-for` — Client IP (fallback: cf-connecting-ip)
 - `user-agent` — Browser/crawler detection
-- `referer` — Traffic source
+- `referer` — Traffic source (truncated ≤500 chars before storing)
 
 **Rate Limiting Strategy**:
 ```typescript
@@ -358,8 +357,10 @@ if (!BOT_PATTERN.test(userAgent)) {
 ```
 
 **Security Checks**:
-- Short code format: `^[A-Z0-9_-]{3,20}$` (uppercase, exact match)
+- Short code format: auto `^[A-Z0-9]{6}$` OR custom `^[A-Z0-9_-]{3,20}$` (validated in db.ts before INSERT)
+- Custom code collision detection (try-catch on UNIQUE constraint)
 - Redirect target protocol: `^https?://` (block javascript:, data:)
+- SSRF guard in proxy function: blocks localhost, 10.x, 172.16-31.x, 192.168.x, 169.254.x
 - Response headers: `Cache-Control: no-store`, `X-Robots-Tag: noindex`
 
 ---
@@ -440,6 +441,7 @@ All responses include CORS headers for browser access.
 | Atomic geo update | 2026-03-16 | Add upsert_geo_routes() RPC function |
 | Analytics summaries RPC | 2026-03-16 | Add get_link_click_summaries(uuid[]) aggregate function |
 | Analytics detail RPC | 2026-03-16 | Add get_link_click_detail(uuid) aggregate function |
+| Click events restrict | 2026-03-16 | Drop click_events_insert_public policy; service role only |
 
 ---
 

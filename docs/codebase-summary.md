@@ -23,14 +23,14 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 132 |
-| **Repo Tokens** | ~91K |
-| **Tests** | 40 passing |
-| **Test Coverage** | ~66% (app tests + gateway smoke tests) |
-| **Code Files** | ~50 (src/ + supabase/) |
+| **Total Files** | 140+ |
+| **Repo Tokens** | ~95K |
+| **Tests** | 97 passing |
+| **Test Coverage** | ~72% (app tests + gateway smoke tests + component tests) |
+| **Code Files** | ~55 (src/ + supabase/ + functions/) |
 | **Dependencies** | 24 prod + 13 dev |
 | **Build Time** | ~10s |
-| **Bundle Size** | ~350KB (gzipped) |
+| **Bundle Size** | 239KB gzipped (main), StatsPanel lazy-loaded |
 
 ---
 
@@ -137,13 +137,14 @@ Detects mobile breakpoint (768px).
 id UUID PRIMARY KEY
 user_id UUID FK → auth.users(id)
 name TEXT
-short_code TEXT UNIQUE  -- auto-generated 6-char or custom 3-20 chars: [A-Z0-9_-]
+short_code TEXT UNIQUE  -- auto-generated: ^[A-Z0-9]{6}$ OR custom: ^[A-Z0-9_-]{3,20}$ (validated & collision-safe)
 default_url TEXT
 is_active BOOLEAN
 created_at TIMESTAMP
 updated_at TIMESTAMP
 
 RLS: owner-only (SELECT, INSERT, UPDATE, DELETE)
+Validation: custom codes validated in db.ts before INSERT; reject invalid format
 ```
 
 ### geo_routes
@@ -167,10 +168,11 @@ country TEXT
 country_code TEXT
 ip_address TEXT
 user_agent TEXT
-referer TEXT
+referer TEXT (truncated ≤500 chars)
 created_at TIMESTAMP
 
-RLS: Public INSERT, owner SELECT
+RLS: RESTRICTED INSERT (service role only via edge function, no public INSERT)
+RLS: Owner-only SELECT
 ```
 
 ---
@@ -252,19 +254,19 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 ---
 
-## Testing (40 tests total)
+## Testing (97 tests total)
 
 ### Schemas (17 tests)
-- Valid/invalid link forms
+- Valid/invalid link forms (auto-code + custom-code patterns)
 - Valid/invalid auth credentials
 - URL validation (protocol, format)
 - Geo route validation
 
 ### Database (11 tests)
 - Fetch links
-- Generate short code (collision)
-- Create/update/delete link
-- Insert geo routes
+- Generate short code (collision-safe)
+- Create/update/delete link (with custom code validation)
+- Insert geo routes (error handling)
 - Aggregate analytics summary query
 - Detailed analytics RPC normalization
 
@@ -274,6 +276,26 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - Auth event subscription
 - Sign in/up/out
 
+### Link Card (16 tests)
+- Render with link data
+- Actions (delete, edit, copy)
+- Loading/error states
+- Date formatting
+
+### Stats Panel (20 tests)
+- 7-day chart rendering (T12:00:00Z normalization)
+- Country pie chart
+- Referer list
+- Analytics loading/error states
+- No-data states
+
+### Create Link Dialog (17 tests)
+- Form validation (auto vs custom short code)
+- Geo routes validation
+- Submit with new link
+- Custom code format: ^[A-Z0-9_-]{3,20}$
+- Error handling (INVALID_SHORT_CODE_FORMAT message)
+
 ### App Smoke (1 test)
 - Vitest sanity wiring
 
@@ -281,6 +303,10 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - Health endpoint
 - Header forwarding + redirect rewriting
 - Config validation + proxy agent selection
+
+### Query Helpers (4 tests)
+- Analytics summary aggregation
+- Day label formatting
 
 **Run Tests**:
 ```bash
@@ -411,21 +437,26 @@ supabase functions deploy redirect --no-verify-jwt
 - **Redirect latency**: ~50ms (Cloudflare edge)
 - **Page load**: ~1.5s (Vercel CDN + React)
 - **Database queries**: ~50-100ms (Supabase)
-- **Bundle size**: ~350KB gzipped
+- **Main bundle**: 239KB gzipped (optimized)
+- **StatsPanel chunk**: 109KB gzipped (lazy-loaded with Suspense)
 - **React Query caching**: Immediate refetch on mutation
+- **Analytics**: `analyticsByLinkId` wrapped in `useMemo` for perf
 
 ---
 
 ## Security Notes
 
-- ✅ RLS on all tables (owner-only)
+- ✅ RLS on all tables (owner-only qr_links, inherited geo_routes, service-role-only click_events INSERT)
 - ✅ Auth context always resolves loading state
 - ✅ URL protocol validation (block javascript:, data:)
+- ✅ Short code validation: auto `^[A-Z0-9]{6}$`, custom `^[A-Z0-9_-]{3,20}$` (regex enforced in db.ts before INSERT)
+- ✅ Custom short code collision detection (UNIQUE constraint + try-catch)
 - ✅ Rate limiting (1 click/IP/60s)
 - ✅ Bot filtering (crawlers don't count)
+- ✅ SSRF protection (block private IPs: localhost, 10.x, 172.16-31.x, 192.168.x, 169.254.x) in supabase/functions/proxy
+- ✅ Referer truncation ≤500 chars in redirect function
 - ✅ CORS headers on edge function
-- ⚠️ Business components still lack automated tests
-- ⚠️ The redirect edge function still relies on manual verification; the proxy gateway now has smoke coverage
+- ✅ Click events INSERT restricted to service role (removed public policy)
 
 ---
 
@@ -433,10 +464,10 @@ supabase functions deploy redirect --no-verify-jwt
 
 | Issue | Severity | Fix Time | Status |
 |-------|----------|----------|--------|
-| 0% component test coverage | Medium | 2-3 hours | Pending |
-| Redirect edge paths lack tests | Medium | 2-3 hours | Pending |
+| Component test coverage (53/97 tests added) | Medium | ✅ In Progress | 54% → 72% |
+| Redirect edge paths RPC coverage | Medium | 2-3 hours | Pending |
 | Long-range analytics pre-aggregation | Medium | 1-2 hours | Pending |
-| Main bundle size warning | Low | 1-2 hours | Pending |
+| Main bundle size reduction (350KB → 239KB) | Low | ✅ Fixed | StatsPanel lazy-loaded |
 
 ---
 
