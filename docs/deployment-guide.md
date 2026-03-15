@@ -520,6 +520,68 @@ supabase db push
 
 ---
 
+## China Accessibility (Custom Redirect Domain)
+
+QR codes mặc định trỏ đến `supabase.co` — có thể bị block bởi Great Firewall (GFW).
+Để phục vụ khách Trung Quốc, cấu hình custom domain accessible từ TQ.
+
+### Cách hoạt động
+
+```
+QR Code → r.yourdomain.com/CODE   ← custom domain (accessible từ TQ)
+               ↓ proxy
+          supabase.co/functions/v1/redirect/CODE
+               ↓ geo-routing
+          Target URL
+```
+
+Proxy **phải forward `cf-ipcountry` header** để geo-routing tiếp tục hoạt động đúng.
+
+### Option A: Cloudflare Workers (miễn phí, không guaranteed ở TQ ~70%)
+
+```bash
+# 1. Sửa SUPABASE_REDIRECT_URL trong cloudflare-worker/redirect-proxy.js
+# 2. Deploy
+npm install -g wrangler
+wrangler login
+wrangler deploy cloudflare-worker/redirect-proxy.js \
+  --name qrlive-redirect \
+  --route "r.yourdomain.com/*"
+
+# 3. Set env var trong Vercel
+VITE_REDIRECT_BASE_URL=https://r.yourdomain.com
+```
+
+### Option B: Alibaba Cloud Function Compute (100% accessible từ TQ)
+
+1. Tạo Function Compute tại [Alibaba Cloud](https://www.alibabacloud.com/product/function-compute)
+2. Deploy code tương tự `cloudflare-worker/redirect-proxy.js` (Node.js handler)
+3. Bind custom domain tại Alibaba → gán vào function
+4. Set `VITE_REDIRECT_BASE_URL=https://r.yourdomain.com` trong Vercel + redeploy
+
+### Option C: Hong Kong VPS (~$5/tháng, reliable nhất)
+
+```nginx
+# nginx config trên HK VPS
+server {
+  listen 80;
+  server_name r.yourdomain.com;
+
+  location ~ ^/(.+)$ {
+    proxy_pass https://YOUR_PROJECT.supabase.co/functions/v1/redirect/$1;
+    proxy_set_header cf-ipcountry $http_cf_ipcountry;
+    proxy_set_header User-Agent $http_user_agent;
+  }
+}
+```
+
+### Test GFW blocking
+
+- [blockedinchina.net](https://www.blockedinchina.net) — kiểm tra URL bị block không
+- Ping từ HK VPS để verify connectivity đến Supabase
+
+---
+
 ## Support & Resources
 
 - **Supabase Docs**: https://supabase.com/docs

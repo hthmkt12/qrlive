@@ -142,5 +142,10 @@ export async function deleteLinkInDB(id: string) {
 }
 
 export function getRedirectUrl(shortCode: string): string {
-  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/redirect/${shortCode}`;
+  // VITE_REDIRECT_BASE_URL allows custom domain (e.g. China-accessible proxy).
+  // Falls back to Supabase Edge Function URL when not configured.
+  const base =
+    import.meta.env.VITE_REDIRECT_BASE_URL ||
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/redirect`;
+  return `${base}/${shortCode}`;
 }
