@@ -135,7 +135,7 @@ export function LinkCard({ link, onSelect, onEdit }: LinkCardProps) {
                 const c = COUNTRIES.find((c) => c.code === r.country_code);
                 return (
                   <span
-                    key={r.country_code}
+                    key={r.id ?? r.country_code}
                     className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
                     title={r.bypass_url ? `Bypass: ${r.bypass_url}` : undefined}
                   >

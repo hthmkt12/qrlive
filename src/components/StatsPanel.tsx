@@ -79,7 +79,7 @@ export function StatsPanel({ link, onBack }: StatsPanelProps) {
               {link.geo_routes.map((r) => {
                 const c = COUNTRIES.find((c) => c.code === r.country_code);
                 return (
-                  <div key={r.country_code} className="flex items-center gap-2 text-sm mb-2">
+                  <div key={r.id ?? r.country_code} className="flex items-center gap-2 text-sm mb-2">
                     <span>{c?.flag}</span>
                     <span className="font-mono text-muted-foreground">{r.country_code}</span>
                     <span className="text-muted-foreground">→</span>

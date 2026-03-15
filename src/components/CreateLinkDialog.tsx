@@ -50,7 +50,7 @@ export function CreateLinkDialog() {
           targetUrl: r.targetUrl,
           bypassUrl: r.bypassUrl || undefined,
         })),
-        userId: user!.id,
+        userId: user?.id ?? "",
       });
       reset();
       setOpen(false);
