@@ -64,7 +64,9 @@ export function CreateLinkDialog() {
       const msg =
         err instanceof Error && err.message === "SHORT_CODE_TAKEN"
           ? "Short code này đã được dùng, vui lòng chọn cái khác"
-          : "Lỗi tạo link";
+          : err instanceof Error && err.message === "INVALID_SHORT_CODE_FORMAT"
+            ? "Short code chỉ được chứa chữ cái, số, dấu gạch ngang (-) và gạch dưới (_), dài 3–20 ký tự"
+            : "Lỗi tạo link";
       toast({ title: msg, variant: "destructive" });
     }
   };

@@ -9,7 +9,6 @@ export interface QRLinkRow {
   created_at: string;
   updated_at: string;
   geo_routes: GeoRouteRow[];
-  click_events: ClickEventRow[];
 }
 
 export interface GeoRouteRow {
@@ -24,10 +23,7 @@ export interface GeoRouteRow {
 export interface ClickEventRow {
   id: string;
   link_id: string;
-  country: string | null;
   country_code: string | null;
-  ip_address: string | null;
-  user_agent: string | null;
   referer: string | null;
   created_at: string;
 }
@@ -35,11 +31,111 @@ export interface ClickEventRow {
 export async function fetchLinks(): Promise<QRLinkRow[]> {
   const { data, error } = await supabase
     .from("qr_links")
-    .select("*, geo_routes(*), click_events(*)")
+    .select("*, geo_routes(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return (data as QRLinkRow[]) || [];
+}
+
+export interface LinkAnalyticsSummaryRow {
+  link_id: string;
+  total_clicks: number;
+  today_clicks: number;
+  top_country_code: string | null;
+}
+
+export interface LinkAnalyticsDayRow {
+  date: string;
+  clicks: number;
+}
+
+export interface LinkAnalyticsCountryRow {
+  country_code: string;
+  clicks: number;
+}
+
+export interface LinkAnalyticsRefererRow {
+  referer: string;
+  clicks: number;
+}
+
+export interface LinkAnalyticsDetailRow {
+  link_id: string;
+  total_clicks: number;
+  today_clicks: number;
+  countries_count: number;
+  clicks_by_day: LinkAnalyticsDayRow[];
+  country_breakdown: LinkAnalyticsCountryRow[];
+  referer_breakdown: LinkAnalyticsRefererRow[];
+}
+
+export async function fetchLinkAnalyticsSummaries(
+  linkIds: string[]
+): Promise<LinkAnalyticsSummaryRow[]> {
+  if (linkIds.length === 0) return [];
+
+  const { data, error } = await supabase.rpc("get_link_click_summaries", {
+    p_link_ids: linkIds,
+  });
+
+  if (error) throw error;
+
+  return ((data as LinkAnalyticsSummaryRow[] | null) || []).map((row) => ({
+    ...row,
+    total_clicks: Number(row.total_clicks || 0),
+    today_clicks: Number(row.today_clicks || 0),
+  }));
+}
+
+function normalizeAnalyticsRows<T extends Record<string, unknown>>(
+  value: unknown,
+  mapper: (row: Record<string, unknown>) => T
+): T[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+    .map(mapper);
+}
+
+export async function fetchLinkAnalyticsDetail(linkId: string): Promise<LinkAnalyticsDetailRow> {
+  const { data, error } = await supabase.rpc("get_link_click_detail", {
+    p_link_id: linkId,
+  });
+
+  if (error) throw error;
+
+  const row = ((data as LinkAnalyticsDetailRow[] | null) || [])[0];
+  if (!row) {
+    return {
+      link_id: linkId,
+      total_clicks: 0,
+      today_clicks: 0,
+      countries_count: 0,
+      clicks_by_day: [],
+      country_breakdown: [],
+      referer_breakdown: [],
+    };
+  }
+
+  return {
+    link_id: row.link_id,
+    total_clicks: Number(row.total_clicks || 0),
+    today_clicks: Number(row.today_clicks || 0),
+    countries_count: Number(row.countries_count || 0),
+    clicks_by_day: normalizeAnalyticsRows(row.clicks_by_day, (entry) => ({
+      date: String(entry.date || ""),
+      clicks: Number(entry.clicks || 0),
+    })),
+    country_breakdown: normalizeAnalyticsRows(row.country_breakdown, (entry) => ({
+      country_code: String(entry.country_code || ""),
+      clicks: Number(entry.clicks || 0),
+    })),
+    referer_breakdown: normalizeAnalyticsRows(row.referer_breakdown, (entry) => ({
+      referer: String(entry.referer || "direct"),
+      clicks: Number(entry.clicks || 0),
+    })),
+  };
 }
 
 /** Generate a 6-char alphanumeric short code, retrying up to 5 times on collision */
@@ -67,6 +163,10 @@ export async function createLinkInDB(
 
   if (customShortCode && customShortCode.trim() !== "") {
     const normalized = customShortCode.trim().toUpperCase();
+    // Validate format matches redirect validator: 3–20 uppercase alphanumeric, hyphens, underscores
+    if (!/^[A-Z0-9_-]{3,20}$/.test(normalized)) {
+      throw new Error("INVALID_SHORT_CODE_FORMAT");
+    }
     // Check uniqueness before using custom code
     const { data: existing } = await supabase
       .from("qr_links")
@@ -104,11 +204,12 @@ export async function createLinkInDB(
       }));
 
     if (routes.length > 0) {
-      await supabase.from("geo_routes").insert(routes);
+      const { error: routesError } = await supabase.from("geo_routes").insert(routes);
+      if (routesError) throw routesError;
     }
   }
 
-  return { ...link, geo_routes: [], click_events: [] } as QRLinkRow;
+  return { ...link, geo_routes: [] } as QRLinkRow;
 }
 
 export async function updateLinkInDB(

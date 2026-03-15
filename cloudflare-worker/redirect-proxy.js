@@ -5,7 +5,7 @@
  * Purpose: make QR links accessible from China / regions where supabase.co is blocked.
  *
  * Deploy:
- *   1. Replace SUPABASE_REDIRECT_URL below with your Supabase project URL
+ *   1. Set env var: wrangler secret put SUPABASE_REDIRECT_URL (or add to wrangler.toml [vars])
  *   2. wrangler deploy redirect-proxy.js --name qrlive-redirect --route "r.yourdomain.com/*"
  *
  * DNS setup:
@@ -18,10 +18,12 @@
  * which the Supabase function uses for geo-routing. Do NOT strip headers.
  */
 
-const SUPABASE_REDIRECT_URL = "https://YOUR_PROJECT_ID.supabase.co/functions/v1/redirect";
+// SUPABASE_REDIRECT_URL must be set as a Cloudflare Worker env var (wrangler secret / wrangler.toml [vars]).
+// Never hardcode the URL here — it exposes the Supabase project subdomain in version control.
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
+    const SUPABASE_REDIRECT_URL = env.SUPABASE_REDIRECT_URL;
     const url = new URL(request.url);
 
     // Handle CORS preflight

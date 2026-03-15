@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
     }
 
     const userAgent = req.headers.get("user-agent") || "";
-    const referer = req.headers.get("referer") || "direct";
+    // Truncate referer to prevent unbounded DB writes from crafted headers
+    const referer = (req.headers.get("referer") || "direct").substring(0, 500);
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("cf-connecting-ip") ||

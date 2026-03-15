@@ -1,0 +1,115 @@
+/**
+ * Supabase Edge Function: Content Proxy
+ *
+ * Zero-infrastructure alternative to Japan VPS. Fetches a target URL server-side
+ * and streams the response back to the client.
+ *
+ * IMPORTANT CAVEAT: supabase.co may itself be blocked by GFW in China.
+ * Use Japan VPS (japan-proxy/) for production. This is for testing/fallback only.
+ *
+ * Required env vars (set via Supabase dashboard or CLI):
+ *   PROXY_SECRET        — secret key clients must supply in ?key= param
+ *   PROXY_ALLOWED_HOSTS — comma-separated allowlist, e.g. "www.company.com,files.company.com"
+ *
+ * Usage:
+ *   /functions/v1/proxy?url=https://www.company.com/page&key=SECRET
+ *
+ * Deploy:
+ *   supabase functions deploy proxy --no-verify-jwt
+ */
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const targetUrl = url.searchParams.get("url");
+    const key = url.searchParams.get("key");
+
+    // Validate secret key — prevents unauthorized use as open proxy
+    const proxySecret = Deno.env.get("PROXY_SECRET");
+    if (!proxySecret || !key || key !== proxySecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate target URL format
+    if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
+      return new Response(JSON.stringify({ error: "Invalid URL" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Allowlist check — prevents proxying arbitrary hosts
+    const allowedHosts = (Deno.env.get("PROXY_ALLOWED_HOSTS") || "")
+      .split(",")
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (allowedHosts.length === 0) {
+      return new Response(JSON.stringify({ error: "PROXY_ALLOWED_HOSTS not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const targetHost = new URL(targetUrl).hostname.toLowerCase();
+
+    // SSRF guard: block private/loopback IP ranges to prevent internal network access
+    const SSRF_PATTERN = /^(localhost|127\.\d+\.\d+\.\d+|::1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+)$/i;
+    if (SSRF_PATTERN.test(targetHost)) {
+      return new Response(JSON.stringify({ error: "Host not allowed" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!allowedHosts.includes(targetHost)) {
+      return new Response(JSON.stringify({ error: "Host not allowed" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Fetch target URL — server-side, unaffected by client's GFW restrictions
+    const upstream = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "QRLive-Proxy/1.0",
+        Accept: req.headers.get("Accept") || "*/*",
+        "Accept-Language": req.headers.get("Accept-Language") || "zh-CN,zh;q=0.9,en;q=0.8",
+      },
+      redirect: "follow",
+    });
+
+    // Build response headers — pass through Content-Type and Content-Length
+    const headers = new Headers(corsHeaders);
+    const contentType = upstream.headers.get("Content-Type");
+    if (contentType) headers.set("Content-Type", contentType);
+    const contentLength = upstream.headers.get("Content-Length");
+    if (contentLength) headers.set("Content-Length", contentLength);
+    // No proxy-level caching — each request fetches fresh content
+    headers.set("Cache-Control", "no-store");
+
+    // Stream response body directly — avoids buffering large responses in memory
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers,
+    });
+  } catch (error) {
+    console.error("Proxy fetch error:", error);
+    return new Response(JSON.stringify({ error: "Proxy fetch failed" }), {
+      status: 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

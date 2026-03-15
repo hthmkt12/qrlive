@@ -1,17 +1,28 @@
-import { useState } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { QrCode, Zap, Globe, BarChart3, Shield, LogOut, Sun, Moon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateLinkDialog } from "@/components/CreateLinkDialog";
 import { LinkCard } from "@/components/LinkCard";
-import { StatsPanel } from "@/components/StatsPanel";
+// Lazy-load StatsPanel (pulls in Recharts ~80KB) — only loaded when user opens analytics view
+const StatsPanel = lazy(() => import("@/components/StatsPanel").then((m) => ({ default: m.StatsPanel })));
 import { EditLinkDialog } from "@/components/EditLinkDialog";
-import { QRLinkRow } from "@/lib/db";
-import { useLinks } from "@/hooks/use-links";
+import { LinkAnalyticsDetailRow, QRLinkRow } from "@/lib/db";
+import { useLinkAnalyticsDetail, useLinkAnalyticsSummaries, useLinks } from "@/hooks/use-links";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
+
+const EMPTY_ANALYTICS_DETAIL: LinkAnalyticsDetailRow = {
+  link_id: "",
+  total_clicks: 0,
+  today_clicks: 0,
+  countries_count: 0,
+  clicks_by_day: [],
+  country_breakdown: [],
+  referer_breakdown: [],
+};
 
 const Index = () => {
   const [selectedLink, setSelectedLink] = useState<QRLinkRow | null>(null);
@@ -20,6 +31,14 @@ const Index = () => {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { data: links = [], isLoading } = useLinks();
+  const selectedLinkId = selectedLink?.id ?? null;
+  const linkIds = links.map((link) => link.id);
+  const { data: analyticsSummaries = [], isLoading: analyticsLoading } = useLinkAnalyticsSummaries(linkIds);
+  const { data: selectedAnalytics, isLoading: statsLoading } = useLinkAnalyticsDetail(selectedLinkId);
+  const analyticsByLinkId = useMemo(
+    () => new Map(analyticsSummaries.map((summary) => [summary.link_id, summary])),
+    [analyticsSummaries]
+  );
 
   const handleSignOut = async () => {
     try {
@@ -35,13 +54,20 @@ const Index = () => {
     if (freshLink) {
       return (
         <div className="min-h-screen bg-background p-6 md:p-10">
-          <StatsPanel link={freshLink} onBack={() => setSelectedLink(null)} />
+          <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
+            <StatsPanel
+              link={freshLink}
+              analytics={selectedAnalytics ?? EMPTY_ANALYTICS_DETAIL}
+              isLoading={statsLoading}
+              onBack={() => setSelectedLink(null)}
+            />
+          </Suspense>
         </div>
       );
     }
   }
 
-  const totalClicks = links.reduce((sum, l) => sum + (l.click_events?.length || 0), 0);
+  const totalClicks = analyticsSummaries.reduce((sum, summary) => sum + summary.total_clicks, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,7 +112,7 @@ const Index = () => {
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
             <BarChart3 className="h-5 w-5 text-success mb-2" />
-            <p className="text-2xl font-bold">{totalClicks}</p>
+            <p className="text-2xl font-bold">{analyticsLoading && links.length > 0 ? "..." : totalClicks}</p>
             <p className="text-xs text-muted-foreground">Tổng clicks</p>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
@@ -154,6 +180,8 @@ const Index = () => {
               <LinkCard
                 key={link.id}
                 link={link}
+                analytics={analyticsByLinkId.get(link.id)}
+                analyticsLoading={analyticsLoading}
                 onSelect={setSelectedLink}
                 onEdit={setEditingLink}
               />
