@@ -111,6 +111,46 @@ Phase 01 + 02 + deploy Supabase trước để có auth foundation. Sau đó imp
 
 ---
 
+## Red Team Review
+
+### Session — 2026-03-16
+**Findings:** 15 (13 accepted, 2 rejected)
+**Severity breakdown:** 5 Critical, 6 High, 4 Medium (2 rejected were Medium)
+
+| # | Finding | Severity | Disposition | Applied To |
+|---|---------|----------|-------------|------------|
+| 1 | `geo_routes` RLS undefined — no SQL written | Critical | Accept | Phase 02, TASK-06 |
+| 2 | `bypass_url` open redirect — phishing/SSRF | Critical | Accept | Phase 09, TASK-49 |
+| 3 | Existing rows orphaned after `user_id` migration | Critical | Accept | Phase 02, TASK-05 |
+| 4 | Service role + public INSERT contradiction | Critical | Accept | Phase 02, TASK-06 + Phase 05, TASK-26 |
+| 5 | Phase 09 is pre-MVP scope creep | Critical | Accept | Phase 09 header + plan.md MVP table |
+| 6 | Short code TOCTOU — client-side retry mandated out | High | Accept | Phase 03, TASK-15 |
+| 7 | E2E tests against production — no test env | High | Accept | Phase 07, TASK-38 |
+| 8 | Phase 08 split deploy — no backup/rollback path | High | Accept | Phase 08, TASK-41 |
+| 9 | Optimistic toggle — no `onError` rollback | High | Accept | Phase 04, TASK-19 |
+| 10 | `cf-ipcountry` spoofable via direct Supabase URL | High | Accept | Phase 05, TASK-22 |
+| 11 | No rate limiting on public redirect endpoint | High | Accept | Phase 05, TASK-25.5 (new) |
+| 12 | `bypass_url ?? target_url` bug (nullish vs falsy) | Medium | Accept | Phase 09, TASK-49 |
+| 13 | 54 tasks with no MVP cut line | Medium | Accept | plan.md MVP table |
+| 14 | No email confirmation enforced | Medium | Reject | Supabase dashboard config, not plan scope |
+| 15 | Supabase URL in plan committed to repo | Medium | Reject | Pre-existing, not plan-specific |
+
+---
+
+## MVP Cut Line (Red Team Addition)
+
+> ⚠️ **[RED TEAM #13 — Medium]** 54 tasks with no P0 subset defined. Implementers have no guidance on what's required to ship vs. what's deferrable.
+
+| Tier | Phases | Required to ship? |
+|------|--------|-------------------|
+| **P0 (Must ship)** | 01, 02, 05, 08 | Yes — Cleanup, Auth/RLS, Edge hardening, Deploy |
+| **P1 (Should ship)** | 03, 04 | Yes — Form validation, React Query |
+| **P2 (Can defer)** | 06, 07, 09 | No — UI Polish, Testing, Bypass URL |
+
+Phase 09 specifically recommended for deferral (see Red Team #5 in phase-09).
+
+---
+
 ## Key Files
 - Entry: `src/main.tsx`, `src/App.tsx`
 - Pages: `src/pages/Index.tsx`

@@ -47,8 +47,9 @@ CN user -> bypass_url points to:
 ```typescript
 // supabase/functions/proxy/index.ts
 
+// [F12-FIXED] Restrict CORS to QRLive origin — wildcard allows any site to read proxied responses
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://qrlive.vercel.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -60,11 +61,13 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const targetUrl = url.searchParams.get("url");
-    const key = url.searchParams.get("key");
+    // key is now in Authorization header (see auth check above — `key` query param removed)
 
-    // Validate secret key
+    // [F2-FIXED] Secret should come from Authorization header, NOT query param
+    // Query params appear in logs, browser history, QR codes, and the geo_routes DB column
+    const authHeader = req.headers.get("Authorization");
     const proxySecret = Deno.env.get("PROXY_SECRET");
-    if (!key || key !== proxySecret) {
+    if (!authHeader || authHeader !== `Bearer ${proxySecret}`) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -93,14 +96,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch target
+    // [F1-FIXED] Do NOT follow redirects — an allowlisted origin could redirect to internal IPs (SSRF)
     const response = await fetch(targetUrl, {
       headers: {
         "User-Agent": "QRLive-Proxy/1.0",
         Accept: req.headers.get("Accept") || "*/*",
       },
-      redirect: "follow",
+      redirect: "manual", // returns opaqueredirect; caller sees 3xx
     });
+
+    // Re-validate redirect target before following
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("Location");
+      if (!location) {
+        return new Response(JSON.stringify({ error: "Bad redirect" }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const redirectHost = new URL(location, targetUrl).hostname.toLowerCase();
+      if (!allowedHosts.includes(redirectHost)) {
+        return new Response(JSON.stringify({ error: "Redirect target not allowed" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Safe to follow — return the Location for the client to navigate
+      return new Response(null, { status: response.status, headers: { Location: location } });
+    }
 
     // Stream response back
     const headers = new Headers(corsHeaders);
@@ -137,7 +160,9 @@ supabase secrets set PROXY_ALLOWED_HOSTS=www.company.com,site2.company.com
 ## Deployment
 
 ```bash
-supabase functions deploy proxy --no-verify-jwt
+# [F7-FIXED] Do NOT use --no-verify-jwt; the redirect edge function must pass a Supabase service role token
+# in the Authorization header when calling this proxy function
+supabase functions deploy proxy
 ```
 
 ## Implementation Steps

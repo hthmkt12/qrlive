@@ -15,6 +15,16 @@ Setup môi trường deploy thực tế. Recommended: **Vercel** (frontend) + **
   ```
 - [ ] Verify app chạy local với `bun dev`
 
+### TASK-40.5: Pre-deployment backup (NEW — Red Team addition)
+> ⚠️ **[RED TEAM #8 — High]** The plan pushes schema migrations to production mid-plan (before Phases 03-07 are implemented), with no rollback path. If Phases 03-07 introduce bugs discovered after the migration is live, rolling back the DB schema requires a down migration on a live DB with real data. **Fix:** Always backup before pushing, define down migrations, use a staging Supabase project.
+```bash
+# Backup production DB before any schema change
+supabase db dump -f backup-$(date +%Y%m%d).sql --linked
+```
+- [ ] Run `supabase db dump` and store backup
+- [ ] Write down migrations for each Phase 02 schema change (reverse of `ALTER TABLE` statements)
+- [ ] Consider using a staging Supabase project to verify migrations before production push
+
 ### TASK-41: Deploy Supabase migrations
 ```bash
 supabase db push

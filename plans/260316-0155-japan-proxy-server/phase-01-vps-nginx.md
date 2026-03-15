@@ -69,6 +69,9 @@ limit_req_zone $binary_remote_addr zone=proxy_limit:10m rate=10r/s;
 
 # Upstream allowlist — ONLY proxy to these domains
 # Add each target domain as a separate upstream block
+# [F8-FIXED] Add resolver so nginx re-resolves DNS on each connection; prevents stale IP after CDN/IP changes
+resolver 8.8.8.8 1.1.1.1 valid=30s ipv6=off;
+
 upstream origin_company {
     server www.company.com:443;
 }
@@ -106,7 +109,7 @@ server {
     # Health check
     location /health {
         access_log off;
-        return 200 '{"status":"ok","server":"jp-proxy"}';
+        return 200 '{"status":"ok"}'; # [F13-FIXED] Don't fingerprint as proxy; GFW active probers will tag "jp-proxy"
         add_header Content-Type application/json;
     }
 
@@ -116,8 +119,11 @@ server {
 
         proxy_pass https://www.company.com;
         proxy_set_header Host www.company.com;
+        # [F10-FIXED] Verify upstream TLS cert to prevent DNS hijack
+        proxy_ssl_verify on;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr; # [F6-FIXED] Discard client-supplied XFF to prevent IP spoofing/reputation laundering
         proxy_set_header X-Forwarded-Proto $scheme;
 
         # Timeouts
@@ -161,24 +167,32 @@ services:
       - certbot-webroot:/var/www/certbot:ro
       - certbot-certs:/etc/letsencrypt:ro
     restart: unless-stopped
+    # [F4-FIXED] Test HTTPS endpoint, not just HTTP — HTTP health passing doesn't mean SSL is working
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "https://localhost/health", "--resolve", "jp.company.com:443:127.0.0.1"]
       interval: 30s
       timeout: 5s
       retries: 3
+    # [F15-FIXED] Limit log size to prevent disk exhaustion on small VPS
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   certbot:
-    image: certbot/certbot:latest
+    image: certbot/certbot:v2.11.0 # [F9-FIXED] Pin exact version — unpinned :latest exposes privkey.pem to compromised upstream image
     container_name: jp-proxy-certbot
     volumes:
       - certbot-webroot:/var/www/certbot
       - certbot-certs:/etc/letsencrypt
     # Initial cert: run manually first time
     # Renewal: cron or entrypoint loop
+    # [F4-FIXED] Remove --quiet so renewal failures appear in logs; reload nginx after successful renewal
     entrypoint: >
       sh -c "trap exit TERM;
       while :; do
-        certbot renew --webroot -w /var/www/certbot --quiet;
+        certbot renew --webroot -w /var/www/certbot --deploy-hook 'docker exec jp-proxy-nginx nginx -s reload';
         sleep 12h & wait $${!};
       done"
     restart: unless-stopped
@@ -201,19 +215,30 @@ volumes:
 2. Wait for DNS propagation (check with `dig jp.company.com`)
 
 ### Step 3: Initial SSL Certificate
+
+> **[F3-FIXED] Chicken-and-egg bootstrap:** nginx won't load if cert files are absent; certbot needs nginx for ACME challenge.
+> Solution: start nginx with HTTP-only config first, get cert, then activate HTTPS config.
+
 ```bash
-# First time only — get certificate before nginx starts with SSL
+# 3a. Start nginx with HTTP-only config (no SSL server block yet)
+#     Use a bootstrap nginx.conf that ONLY has the port-80 block with /.well-known
+docker compose up -d nginx
+
+# 3b. Issue initial certificate
 docker compose run --rm certbot certonly \
   --webroot -w /var/www/certbot \
   -d jp.company.com \
   --agree-tos --email admin@company.com --non-interactive
+
+# 3c. Replace HTTP-only config with full HTTPS config, reload nginx
+docker compose exec nginx nginx -s reload
 ```
 
-### Step 4: Deploy nginx
+### Step 4: Deploy certbot auto-renew + verify
 ```bash
-# Clone config repo or scp files to VPS
-docker compose up -d
-# Verify
+# Start certbot renewal container
+docker compose up -d certbot
+# Verify end-to-end
 curl -I https://jp.company.com/health
 ```
 

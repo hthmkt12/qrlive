@@ -28,8 +28,26 @@ File: `src/components/EditLinkDialog.tsx`
 
 ### TASK-15: Fix short code collision
 File: `src/lib/db.ts`
-- [ ] Tạo helper `generateUniqueShortCode(supabase)` — thử insert, nếu bị unique violation thì retry tối đa 5 lần với code mới
-- [ ] Hoặc đơn giản hơn: generate server-side trong Supabase function/trigger (khuyến nghị)
+- [ ] ~~Tạo helper `generateUniqueShortCode(supabase)` — thử insert, nếu bị unique violation thì retry tối đa 5 lần với code mới~~
+- [ ] **[RED TEAM #6 — High] MANDATE server-side approach only.** Client-side retry is a TOCTOU race: two concurrent clients generate the same code, both check SELECT (both see empty), both INSERT → one fails after all retries. Use a Postgres function:
+  ```sql
+  CREATE OR REPLACE FUNCTION generate_short_code() RETURNS TEXT AS $$
+  DECLARE
+    chars TEXT := 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    code TEXT;
+  BEGIN
+    LOOP
+      code := '';
+      FOR i IN 1..6 LOOP
+        code := code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
+      END LOOP;
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM qr_links WHERE short_code = code);
+    END LOOP;
+    RETURN code;
+  END;
+  $$ LANGUAGE plpgsql;
+  ```
+  Set as column default: `ALTER TABLE qr_links ALTER COLUMN short_code SET DEFAULT generate_short_code();`
 
 ### TASK-16: URL validation ở Edge Function
 File: `supabase/functions/redirect/index.ts`

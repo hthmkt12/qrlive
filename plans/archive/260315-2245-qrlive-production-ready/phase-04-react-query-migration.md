@@ -22,6 +22,22 @@ File mới: `src/hooks/use-link-mutations.ts`
 - [ ] `useUpdateLink()` — invalidate on success
 - [ ] `useDeleteLink()` — invalidate on success + optimistic delete (optional)
 - [ ] `useToggleActive()` — optimistic update: flip `is_active` locally trước khi server confirm
+  > ⚠️ **[RED TEAM #9 — High]** Must include explicit `onError` rollback. Without it, if the server update fails (network error, expired session), UI shows "inactive" while DB still has "active" — user believes link is disabled but it keeps redirecting. Security-sensitive failure mode.
+  > ```typescript
+  > useToggleActive() = useMutation({
+  >   mutationFn: toggleActive,
+  >   onMutate: async (id) => {
+  >     await queryClient.cancelQueries(QUERY_KEYS.links);
+  >     const previous = queryClient.getQueryData(QUERY_KEYS.links);
+  >     queryClient.setQueryData(QUERY_KEYS.links, (old) => old.map(l => l.id === id ? {...l, is_active: !l.is_active} : l));
+  >     return { previous };
+  >   },
+  >   onError: (err, id, context) => {
+  >     queryClient.setQueryData(QUERY_KEYS.links, context.previous); // MANDATORY rollback
+  >   },
+  >   onSettled: () => queryClient.invalidateQueries(QUERY_KEYS.links),
+  > })
+  > ```
 
 ### TASK-20: Refactor Index.tsx
 File: `src/pages/Index.tsx`

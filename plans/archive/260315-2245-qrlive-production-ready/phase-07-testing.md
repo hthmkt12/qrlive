@@ -35,11 +35,20 @@ File: `src/test/create-link-dialog.test.tsx`
 
 ### TASK-38: E2E test — happy path (Playwright)
 File: `src/test/e2e/create-and-redirect.spec.ts`
+
+> ⚠️ **[RED TEAM #7 — High]** "Login với test account" — no environment defined, no credentials source, no test isolation. Without a separate Supabase project for testing, this runs against production: creates real links, generates real analytics, cleanup failures leave permanent artifacts. **Fix:**
+> - Use `supabase start` (local Supabase) for E2E, set `PLAYWRIGHT_TEST_BASE_URL=http://localhost:5173` and `VITE_SUPABASE_URL=http://localhost:54321` in `.env.test`
+> - Store test credentials in `PLAYWRIGHT_TEST_EMAIL` / `PLAYWRIGHT_TEST_PASSWORD` env vars, documented in `.env.example`
+> - Add `afterEach` cleanup that deletes all links created by the test user
+
+- [ ] **Define test environment** — local Supabase instance (not production)
+- [ ] **Document credentials** — `PLAYWRIGHT_TEST_EMAIL` + `PLAYWRIGHT_TEST_PASSWORD` in `.env.example`
 - [ ] Login với test account
 - [ ] Tạo QR link mới
 - [ ] Verify card xuất hiện trong danh sách
 - [ ] Click stats → StatsPanel hiển thị
 - [ ] Xóa link → card biến mất
+- [ ] `afterEach`: delete all links created during test (runs even on failure)
 
 ### TASK-39: Xóa placeholder test
 File: `src/test/example.test.ts`

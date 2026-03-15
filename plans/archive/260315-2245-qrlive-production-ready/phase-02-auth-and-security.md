@@ -14,6 +14,14 @@ Hiện tại app hoàn toàn public — bất kỳ ai cũng có thể xóa/sửa
   ALTER TABLE qr_links ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
   ```
 
+> ⚠️ **[RED TEAM #3 — Critical]** Existing rows will have `user_id = NULL`. RLS `USING (auth.uid() = user_id)` returns FALSE for NULLs → all pre-existing links become invisible and unmanageable (links still redirect via service role, but users cannot edit/delete). **Fix:** If greenfield, document it explicitly. If not, add a backfill step: assign orphaned rows to an admin user or use `NOT NULL` only after backfill. Add to migration:
+> ```sql
+> -- Option A (greenfield): assert no prior data
+> -- Option B: backfill to a designated admin user_id before adding NOT NULL
+> UPDATE qr_links SET user_id = '<admin-uuid>' WHERE user_id IS NULL;
+> ALTER TABLE qr_links ALTER COLUMN user_id SET NOT NULL;
+> ```
+
 ### TASK-06: Update RLS Policies
 File: new migration `supabase/migrations/YYYYMMDD_rls_auth.sql`
 - [ ] `qr_links`: chỉ owner mới đọc/sửa/xóa
@@ -24,10 +32,26 @@ File: new migration `supabase/migrations/YYYYMMDD_rls_auth.sql`
   CREATE POLICY "owner_delete" ON qr_links FOR DELETE USING (auth.uid() = user_id);
   ```
 - [ ] `geo_routes`: inherit qua link_id (join check)
+  > ⚠️ **[RED TEAM #1 — Critical]** Placeholder only — no SQL written. Without an explicit policy, RLS on `geo_routes` either blocks all reads (deny-all default) or allows cross-user access (if RLS not enabled). **Fix:** Write the explicit policy:
+  > ```sql
+  > ALTER TABLE geo_routes ENABLE ROW LEVEL SECURITY;
+  > CREATE POLICY "owner_select_geo_routes" ON geo_routes FOR SELECT
+  >   USING (EXISTS (SELECT 1 FROM qr_links WHERE qr_links.id = geo_routes.link_id AND qr_links.user_id = auth.uid()));
+  > CREATE POLICY "owner_insert_geo_routes" ON geo_routes FOR INSERT
+  >   WITH CHECK (EXISTS (SELECT 1 FROM qr_links WHERE qr_links.id = geo_routes.link_id AND qr_links.user_id = auth.uid()));
+  > CREATE POLICY "owner_update_geo_routes" ON geo_routes FOR UPDATE
+  >   USING (EXISTS (SELECT 1 FROM qr_links WHERE qr_links.id = geo_routes.link_id AND qr_links.user_id = auth.uid()));
+  > CREATE POLICY "owner_delete_geo_routes" ON geo_routes FOR DELETE
+  >   USING (EXISTS (SELECT 1 FROM qr_links WHERE qr_links.id = geo_routes.link_id AND qr_links.user_id = auth.uid()));
+  > ```
 - [ ] `click_events`: insert public (edge fn cần insert), select chỉ owner
   ```sql
   -- Edge function insert không cần auth (service role hoặc public)
   CREATE POLICY "public_insert_clicks" ON click_events FOR INSERT WITH CHECK (true);
+  -- ⚠️ [RED TEAM #4 — Critical] CONTRADICTION with TASK-26: if the edge fn uses service role (bypasses RLS),
+  -- this public INSERT policy is redundant AND dangerous — any unauthenticated client can poison analytics.
+  -- Decision required: use service role in edge fn (preferred) and remove this public policy, OR keep public
+  -- policy and don't use service role for click inserts. Cannot do both safely.
   -- Chỉ owner xem analytics
   CREATE POLICY "owner_select_clicks" ON click_events FOR SELECT
     USING (EXISTS (SELECT 1 FROM qr_links WHERE qr_links.id = click_events.link_id AND qr_links.user_id = auth.uid()));

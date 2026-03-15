@@ -2,6 +2,8 @@
 
 **Priority:** 🟠 High | **Status:** Todo
 
+> ⚠️ **[RED TEAM #5 — Critical] SCOPE CREEP WARNING:** This phase adds schema migration + edge function change + 4 UI components before core (Phases 01-08) is validated in production. Recommend deferring to v2. Phases 01+02+05+08 constitute a shippable MVP. Phase 09 introduces a 3rd URL-tier override that adds complexity before there are production users to need it. **Decision required:** defer or proceed with awareness of increased failure surface.
+
 ## Overview
 Thêm field `bypass_url` vào `geo_routes`. Khi scan QR từ một quốc gia bị block (VN, CN, etc.), Edge Function ưu tiên redirect sang `bypass_url` thay vì `target_url`. App chỉ là **router thông minh** — user tự config mirror/proxy URL bên ngoài.
 
@@ -37,8 +39,21 @@ supabase gen types typescript --local > src/integrations/supabase/types.ts
 File: `supabase/functions/redirect/index.ts`
 - [ ] Sau khi match geo_route, check `bypass_url`:
   ```typescript
+  // ⚠️ [RED TEAM #12 — Medium] BUG: ?? passes empty string "" through (nullish, not falsy).
+  // Use || instead:
   const redirectTarget =
-    matchedRoute?.bypass_url ?? matchedRoute?.target_url ?? link.default_url;
+    matchedRoute?.bypass_url || matchedRoute?.target_url || link.default_url;
+
+  // ⚠️ [RED TEAM #2 — Critical] OPEN REDIRECT: redirectTarget is raw DB value — validate before redirect.
+  // Prevents javascript:, data:, file:// and private IP redirects (SSRF risk).
+  try {
+    const url = new URL(redirectTarget);
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid protocol');
+    // Optional: block private IP ranges (169.254.x.x, 10.x.x.x, 192.168.x.x, etc.)
+  } catch {
+    return new Response('Invalid redirect target', { status: 400 });
+  }
+
   return Response.redirect(redirectTarget, 302);
   ```
 - [ ] Log `bypass_used: true` trong click_event (thêm column hoặc dùng referer field tạm)

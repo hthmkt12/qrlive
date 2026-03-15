@@ -30,7 +30,8 @@ Document how to connect the Japan proxy (Phase 1 or 2) with QRLive's existing by
    - **Target URL**: the original destination (e.g., `https://www.company.com/landing`)
    - **Bypass URL**: the Japan proxy URL (e.g., `https://jp.company.com/landing`)
 6. Save changes
-7. Test by scanning QR code from China (or simulating with `cf-ipcountry: CN` header)
+7. Test by scanning QR code from China.
+   > **[F14-FIXED] Do NOT use `curl -H "cf-ipcountry: CN"` as a production test** — it bypasses the Cloudflare Worker entirely and tests a shortcut. Use an actual CN VPN/proxy or a Cloudflare Worker test environment with real geo headers.
 
 ### How It Works
 
@@ -182,6 +183,13 @@ Chinese users are redirected to the Japan proxy, which forwards to the actual co
 - [ ] Limitations documented honestly
 - [ ] Config templates provided for common use cases
 - [ ] Comparison table helps user choose between Phase 1 and Phase 2
+
+## Security Note: bypass_url Domain Restriction [F11]
+
+> **The redirect edge function currently accepts any HTTPS URL as `bypass_url` with no domain restriction.**
+> Any authenticated user with write access to `geo_routes` can redirect all CN users to an arbitrary HTTPS URL.
+>
+> **Required QRLive-level fix (separate issue):** Add a `BYPASS_URL_ALLOWED_DOMAINS` env var or per-link allowlist, validated in the redirect edge function before issuing the 302.
 
 ## Unresolved Questions
 
