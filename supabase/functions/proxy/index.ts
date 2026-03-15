@@ -114,7 +114,10 @@ Deno.serve(async (req) => {
         });
       }
       // Safe redirect — let client navigate to the allowed location
-      return new Response(null, { status: upstream.status, headers: { Location: location } });
+      return new Response(null, {
+        status: upstream.status,
+        headers: { ...corsHeaders, Location: location },
+      });
     }
 
     // Build response headers — pass through Content-Type and Content-Length
