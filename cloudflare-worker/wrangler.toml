@@ -1,0 +1,19 @@
+# Cloudflare Worker: QR Redirect Proxy
+# Deploy: wrangler deploy --config cloudflare-worker/wrangler.toml
+#
+# Required secrets (set via CLI, never commit):
+#   wrangler secret put SUPABASE_REDIRECT_URL
+#   Value: https://<your-supabase-project>.supabase.co/functions/v1/redirect
+#
+# Required vars (non-secret, set in [vars] or Cloudflare dashboard):
+# none currently
+
+name = "qrlive-redirect"
+main = "redirect-proxy.js"
+compatibility_date = "2024-01-01"
+
+# Route: bind to your custom domain
+# Uncomment and fill in before deploying:
+# [[routes]]
+# pattern = "r.yourdomain.com/*"
+# zone_name = "yourdomain.com"

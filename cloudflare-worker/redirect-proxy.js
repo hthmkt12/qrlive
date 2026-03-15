@@ -24,6 +24,15 @@
 export default {
   async fetch(request, env) {
     const SUPABASE_REDIRECT_URL = env.SUPABASE_REDIRECT_URL;
+
+    // Guard: fail fast if env var not configured — prevents silent undefined/CODE URLs
+    if (!SUPABASE_REDIRECT_URL) {
+      return new Response(JSON.stringify({ error: "SUPABASE_REDIRECT_URL not configured" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const url = new URL(request.url);
 
     // Handle CORS preflight

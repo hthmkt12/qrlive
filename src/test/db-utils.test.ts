@@ -35,6 +35,20 @@ describe("getRedirectUrl", () => {
     const url = getRedirectUrl(code);
     expect(url.endsWith(code)).toBe(true);
   });
+
+  it("uses VITE_REDIRECT_BASE_URL when set (custom domain branch)", () => {
+    vi.stubEnv("VITE_REDIRECT_BASE_URL", "https://r.example.com");
+    const url = getRedirectUrl("ABC123");
+    expect(url).toBe("https://r.example.com/ABC123");
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to Supabase URL when VITE_REDIRECT_BASE_URL is not set", () => {
+    vi.stubEnv("VITE_REDIRECT_BASE_URL", "");
+    const url = getRedirectUrl("ABC123");
+    expect(url).toContain("supabase.co/functions/v1/redirect/ABC123");
+    vi.unstubAllEnvs();
+  });
 });
 
 describe("analytics queries", () => {
