@@ -694,24 +694,39 @@ npm run dev
 
 Required env vars:
 
-- `UPSTREAM_ORIGIN=https://www.company.com`
-- `OUTBOUND_PROXY_URL=socks5://user:pass@proxy.vendor.com:1080`
-- `PORT=8080`
+- `UPSTREAM_ORIGIN=https://www.company.com` — the origin to proxy to (required)
+- `PORT=8080` — pre-set in `fly.toml` (do not change)
+- `HEALTH_REVEAL_UPSTREAM=true` — optional; reveals upstream URL in `/health` response (for debug only — leave unset in production to avoid GFW fingerprinting)
+- `OUTBOUND_PROXY_URL=socks5://...` — optional; only needed if routing via a SOCKS5/HTTP vendor proxy. Leave unset for direct mode (Fly.io Tokyo connects directly to origin).
 
-### Deploy on Fly.io
+### Deploy on Fly.io (primary approach)
+
+`proxy-gateway/fly.toml` is pre-configured for `nrt` (Tokyo) with app name `qrlive-jp-proxy`.
 
 ```bash
+# 1. Create Fly.io app (one-time)
+flyctl auth login
+flyctl apps create qrlive-jp-proxy --machines
+
+# 2. Set required secret
+flyctl secrets set UPSTREAM_ORIGIN=https://www.company.com --app qrlive-jp-proxy
+
+# 3. Deploy from proxy-gateway/ directory
 cd proxy-gateway
-cp fly.toml.example fly.toml
-# Edit app name if needed
-fly launch --copy-config --no-deploy
-fly secrets set \
-  UPSTREAM_ORIGIN=https://www.company.com \
-  OUTBOUND_PROXY_URL=socks5://user:pass@proxy.vendor.com:1080
-fly deploy
+flyctl deploy --app qrlive-jp-proxy
+
+# 4. Verify health
+curl https://qrlive-jp-proxy.fly.dev/health
+# Expected: {"status":"ok","proxyMode":"direct"}
 ```
 
-`fly.toml.example` keeps one machine running so the gateway stays available for QR traffic.
+`fly.toml` keeps `min_machines_running = 1` and `auto_stop_machines = "off"` so the gateway stays always-on for QR traffic.
+
+**GFW block recovery** (switch to Singapore standby):
+```bash
+flyctl regions set sin --app qrlive-jp-proxy && flyctl deploy --app qrlive-jp-proxy
+# Or flip DNS to pre-created qrlive-sg-proxy app + bulk SQL update bypass_url
+```
 
 ### Configure bypass_url in QRLive
 
