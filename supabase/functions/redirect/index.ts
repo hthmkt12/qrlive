@@ -61,14 +61,25 @@ Deno.serve(async (req) => {
 
     // Record click only for real users — skip bots to keep analytics clean
     if (!BOT_PATTERN.test(userAgent)) {
-      await supabase.from("click_events").insert({
-        link_id: link.id,
-        country: countryCode,
-        country_code: countryCode,
-        ip_address: ip,
-        user_agent: userAgent,
-        referer,
-      });
+      // Rate limit: skip if same IP clicked this link within the last 60 seconds
+      const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+      const { count } = await supabase
+        .from("click_events")
+        .select("id", { count: "exact", head: true })
+        .eq("link_id", link.id)
+        .eq("ip_address", ip)
+        .gte("created_at", oneMinuteAgo);
+
+      if (!count || count === 0) {
+        await supabase.from("click_events").insert({
+          link_id: link.id,
+          country: countryCode,
+          country_code: countryCode,
+          ip_address: ip,
+          user_agent: userAgent,
+          referer,
+        });
+      }
     }
 
     // Resolve redirect target: bypass_url → target_url → default_url
@@ -82,6 +93,14 @@ Deno.serve(async (req) => {
         // bypass_url takes priority when set (Phase 09 feature)
         targetUrl = geoRoute.bypass_url || geoRoute.target_url;
       }
+    }
+
+    // Block non-HTTP(S) URLs to prevent javascript: / data: injection
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      return new Response(JSON.stringify({ error: "Invalid redirect target" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(null, {
