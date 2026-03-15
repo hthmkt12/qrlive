@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getRedirectUrl } from "@/lib/db";
+import { cn } from "@/lib/utils";
 
 interface QRPreviewProps {
   url: string;
@@ -12,8 +13,22 @@ interface QRPreviewProps {
   name: string;
 }
 
+type ErrorLevel = "L" | "M" | "Q" | "H";
+
+// Preset color themes for quick QR styling
+const PRESETS = [
+  { label: "Mặc định", fg: "#14D4C0", bg: "#0f1419" },
+  { label: "Trắng",    fg: "#1a1a2e", bg: "#ffffff" },
+  { label: "Tím",      fg: "#7c3aed", bg: "#1e1b4b" },
+  { label: "Cam",      fg: "#f97316", bg: "#1c1008" },
+  { label: "Xanh lá", fg: "#22c55e", bg: "#0a1f0f" },
+] as const;
+
 export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
   const [copied, setCopied] = useState(false);
+  const [fgColor, setFgColor] = useState(PRESETS[0].fg);
+  const [bgColor, setBgColor] = useState(PRESETS[0].bg);
+  const [errorLevel, setErrorLevel] = useState<ErrorLevel>("H");
   const { toast } = useToast();
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +51,7 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
     img.onload = () => {
       canvas.width = 512;
       canvas.height = 512;
-      ctx!.fillStyle = "#0f1419";
+      ctx!.fillStyle = bgColor;
       ctx?.fillRect(0, 0, 512, 512);
       ctx?.drawImage(img, 32, 32, 448, 448);
       const a = document.createElement("a");
@@ -46,6 +61,8 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
     };
     img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
+
+  const activePreset = PRESETS.find((p) => p.fg === fgColor && p.bg === bgColor);
 
   return (
     <motion.div
@@ -57,11 +74,64 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
         <QRCodeSVG
           value={wrapperUrl}
           size={200}
-          bgColor="hsl(220, 18%, 10%)"
-          fgColor="hsl(174, 72%, 50%)"
-          level="H"
+          bgColor={bgColor}
+          fgColor={fgColor}
+          level={errorLevel}
           includeMargin={false}
         />
+      </div>
+
+      {/* Customization controls */}
+      <div className="w-full space-y-2">
+        {/* Preset theme dots */}
+        <div className="flex justify-center gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p.label}
+              title={p.label}
+              onClick={() => { setFgColor(p.fg); setBgColor(p.bg); }}
+              className={cn(
+                "w-7 h-7 rounded-full border-2 transition-all",
+                activePreset?.label === p.label
+                  ? "border-primary scale-110 shadow-md"
+                  : "border-border hover:scale-105"
+              )}
+              style={{ background: `linear-gradient(135deg, ${p.bg} 50%, ${p.fg} 50%)` }}
+            />
+          ))}
+        </div>
+
+        {/* Color pickers + error level */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <label className="flex items-center gap-1 cursor-pointer">
+            QR
+            <input
+              type="color"
+              value={fgColor}
+              onChange={(e) => setFgColor(e.target.value)}
+              className="w-7 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
+            />
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer">
+            Nền
+            <input
+              type="color"
+              value={bgColor}
+              onChange={(e) => setBgColor(e.target.value)}
+              className="w-7 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
+            />
+          </label>
+          <select
+            value={errorLevel}
+            onChange={(e) => setErrorLevel(e.target.value as ErrorLevel)}
+            className="ml-auto h-7 rounded border border-border bg-secondary px-2 text-xs"
+          >
+            <option value="L">Mức L</option>
+            <option value="M">Mức M</option>
+            <option value="Q">Mức Q</option>
+            <option value="H">Mức H</option>
+          </select>
+        </div>
       </div>
 
       <div className="w-full rounded-lg border border-border bg-secondary/50 p-3">
