@@ -7,7 +7,6 @@ export function useLinks() {
   return useQuery({
     queryKey: QUERY_KEYS.links,
     queryFn: fetchLinks,
-    refetchOnWindowFocus: true,
     staleTime: 30_000,
   });
 }

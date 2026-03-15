@@ -40,6 +40,10 @@ export function CreateLinkDialog() {
   };
 
   const onSubmit = async (data: LinkFormInput) => {
+    if (!user) {
+      toast({ title: "Vui lòng đăng nhập trước", variant: "destructive" });
+      return;
+    }
     try {
       await createLink.mutateAsync({
         name: data.name,
@@ -50,7 +54,7 @@ export function CreateLinkDialog() {
           targetUrl: r.targetUrl,
           bypassUrl: r.bypassUrl || undefined,
         })),
-        userId: user?.id ?? "",
+        userId: user.id,
       });
       reset();
       setOpen(false);
