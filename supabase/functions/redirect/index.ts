@@ -18,8 +18,8 @@ Deno.serve(async (req) => {
     const pathParts = url.pathname.split("/");
     const shortCode = pathParts[pathParts.length - 1];
 
-    // Validate short code format: exactly 6 uppercase alphanumeric chars
-    if (!shortCode || !/^[A-Z0-9]{6}$/.test(shortCode)) {
+    // Validate short code format: 3–20 uppercase alphanumeric chars, hyphens, underscores
+    if (!shortCode || !/^[A-Z0-9_-]{3,20}$/.test(shortCode)) {
       return new Response(JSON.stringify({ error: "Invalid short code" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

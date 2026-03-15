@@ -60,9 +60,24 @@ export async function createLinkInDB(
   name: string,
   defaultUrl: string,
   geoRoutes: { country: string; countryCode: string; targetUrl: string; bypassUrl?: string }[],
-  userId: string
+  userId: string,
+  customShortCode?: string
 ): Promise<QRLinkRow> {
-  const shortCode = await generateShortCode();
+  let shortCode: string;
+
+  if (customShortCode && customShortCode.trim() !== "") {
+    const normalized = customShortCode.trim().toUpperCase();
+    // Check uniqueness before using custom code
+    const { data: existing } = await supabase
+      .from("qr_links")
+      .select("id")
+      .eq("short_code", normalized)
+      .maybeSingle();
+    if (existing) throw new Error("SHORT_CODE_TAKEN");
+    shortCode = normalized;
+  } else {
+    shortCode = await generateShortCode();
+  }
 
   const { data: link, error } = await supabase
     .from("qr_links")
@@ -70,7 +85,12 @@ export async function createLinkInDB(
     .select()
     .single();
 
-  if (error || !link) throw error || new Error("Failed to create link");
+  // Postgres unique constraint violation (23505) means short code race — surface friendly error
+  if (error) {
+    if ((error as { code?: string }).code === "23505") throw new Error("SHORT_CODE_TAKEN");
+    throw error;
+  }
+  if (!link) throw new Error("Failed to create link");
 
   if (geoRoutes.length > 0) {
     const routes = geoRoutes

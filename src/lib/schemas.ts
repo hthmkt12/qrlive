@@ -13,6 +13,13 @@ export const linkFormSchema = z.object({
   name: z.string().min(1, "Tên không được để trống").max(100, "Tên quá dài"),
   defaultUrl: z.string().url("URL mặc định không hợp lệ"),
   geoRoutes: z.array(geoRouteSchema).default([]),
+  // Optional custom short code — empty string means auto-generate; normalized to uppercase
+  customShortCode: z
+    .string()
+    .transform((v) => v.toUpperCase())
+    .pipe(z.string().regex(/^[A-Z0-9_-]{3,20}$/, "Short code chỉ chứa chữ, số, - hoặc _, 3–20 ký tự"))
+    .optional()
+    .or(z.literal("")),
 });
 
 // Login / Signup form

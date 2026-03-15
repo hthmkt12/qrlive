@@ -28,7 +28,7 @@ export function CreateLinkDialog() {
     formState: { errors, isSubmitting },
   } = useForm<LinkFormInput>({
     resolver: zodResolver(linkFormSchema),
-    defaultValues: { name: "", defaultUrl: "", geoRoutes: [] },
+    defaultValues: { name: "", defaultUrl: "", geoRoutes: [], customShortCode: "" },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "geoRoutes" });
@@ -55,12 +55,17 @@ export function CreateLinkDialog() {
           bypassUrl: r.bypassUrl || undefined,
         })),
         userId: user.id,
+        customShortCode: data.customShortCode || undefined,
       });
       reset();
       setOpen(false);
       toast({ title: "Đã tạo link thành công! 🎉" });
-    } catch {
-      toast({ title: "Lỗi tạo link", variant: "destructive" });
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message === "SHORT_CODE_TAKEN"
+          ? "Short code này đã được dùng, vui lòng chọn cái khác"
+          : "Lỗi tạo link";
+      toast({ title: msg, variant: "destructive" });
     }
   };
 
@@ -95,6 +100,25 @@ export function CreateLinkDialog() {
             <Label>URL mặc định</Label>
             <Input placeholder="https://example.com" {...register("defaultUrl")} />
             {errors.defaultUrl && <p className="text-xs text-destructive">{errors.defaultUrl.message}</p>}
+          </div>
+
+          {/* Custom short code — optional, empty = auto-generate */}
+          <div className="space-y-1">
+            <Label className="flex items-center gap-2">
+              Short code
+              <span className="text-xs text-muted-foreground font-normal">(tuỳ chọn — để trống để tự tạo)</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground shrink-0 font-mono">/r/</span>
+              <Input
+                placeholder="vi-du-cua-toi"
+                {...register("customShortCode")}
+                className="font-mono"
+              />
+            </div>
+            {errors.customShortCode && (
+              <p className="text-xs text-destructive">{errors.customShortCode.message}</p>
+            )}
           </div>
 
           {/* Geo routes */}

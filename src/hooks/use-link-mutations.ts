@@ -24,12 +24,14 @@ export function useCreateLink() {
       defaultUrl,
       geoRoutes,
       userId,
+      customShortCode,
     }: {
       name: string;
       defaultUrl: string;
       geoRoutes: { country: string; countryCode: string; targetUrl: string }[];
       userId: string;
-    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId),
+      customShortCode?: string;
+    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode),
     onSuccess: invalidate,
   });
 }
