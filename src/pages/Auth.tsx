@@ -31,7 +31,14 @@ export default function Auth() {
       }
       navigate("/");
     } catch (e: unknown) {
-      setServerError(e instanceof Error ? e.message : "Đã có lỗi xảy ra");
+      // Normalize auth errors to prevent user enumeration via specific Supabase messages
+      const raw = e instanceof Error ? e.message : "";
+      const msg = raw.includes("Invalid login credentials")
+        ? "Email hoặc mật khẩu không đúng"
+        : raw.includes("User already registered")
+          ? "Email này đã được đăng ký"
+          : "Đã có lỗi xảy ra. Vui lòng thử lại";
+      setServerError(msg);
     }
   };
 

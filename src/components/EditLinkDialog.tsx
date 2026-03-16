@@ -75,8 +75,13 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
       });
       onOpenChange(false);
       toast({ title: "Đã cập nhật thành công! ✅" });
-    } catch {
-      toast({ title: "Lỗi cập nhật", variant: "destructive" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      toast({
+        title: "Lỗi cập nhật",
+        description: msg || "Vui lòng thử lại",
+        variant: "destructive",
+      });
     }
   };
 
