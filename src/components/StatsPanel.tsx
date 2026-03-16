@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { ArrowLeft, Globe, MousePointerClick, TrendingUp } from "lucide-react";
@@ -5,10 +6,12 @@ import { COUNTRIES } from "@/lib/types";
 import { LinkAnalyticsDetailRow, QRLinkRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { QRPreview } from "./QRPreview";
+import { AnalyticsDateRangePicker, DateRange } from "./analytics-date-range-picker";
+import { useLinkAnalyticsDetailV2 } from "@/hooks/use-links";
 
 interface StatsPanelProps {
   link: QRLinkRow;
-  analytics: LinkAnalyticsDetailRow;
+  analytics: LinkAnalyticsDetailRow; // fallback / initial data
   isLoading?: boolean;
   onBack: () => void;
 }
@@ -24,26 +27,63 @@ const CHART_COLORS = [
   "hsl(320, 60%, 50%)",
 ];
 
+function toISODate(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function defaultDateRange(): DateRange {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 6);
+  return { startDate: toISODate(start), endDate: toISODate(end) };
+}
+
 function formatDayLabel(date: string) {
-  // Use UTC noon to avoid date shift from DST or timezone offset
   return new Date(`${date}T12:00:00Z`).toLocaleDateString("vi-VN", {
     weekday: "short",
     day: "numeric",
   });
 }
 
-export function StatsPanel({ link, analytics, isLoading = false, onBack }: StatsPanelProps) {
-  const clicksByDay = analytics.clicks_by_day.map((entry) => ({
-    date: formatDayLabel(entry.date),
-    clicks: entry.clicks,
-  }));
+/** Aggregate daily clicks into weekly buckets for ranges > 30 days */
+function aggregateWeekly(days: LinkAnalyticsDetailRow["clicks_by_day"]) {
+  const weeks: { date: string; clicks: number }[] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    const slice = days.slice(i, i + 7);
+    const label = formatDayLabel(slice[0].date);
+    const clicks = slice.reduce((sum, d) => sum + d.clicks, 0);
+    weeks.push({ date: label, clicks });
+  }
+  return weeks;
+}
+
+function rangeDays(range: DateRange): number {
+  const ms = new Date(range.endDate).getTime() - new Date(range.startDate).getTime();
+  return Math.round(ms / 86_400_000) + 1;
+}
+
+export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: externalLoading = false, onBack }: StatsPanelProps) {
+  const [dateRange, setDateRange] = useState<DateRange>(defaultDateRange);
+
+  const { data: rangedAnalytics, isLoading: rangedLoading } = useLinkAnalyticsDetailV2(
+    link.id,
+    dateRange.startDate,
+    dateRange.endDate
+  );
+
+  const analytics = rangedAnalytics ?? fallbackAnalytics;
+  const isLoading = externalLoading || rangedLoading;
+  const days = rangeDays(dateRange);
+
+  const chartData = days > 30
+    ? aggregateWeekly(analytics.clicks_by_day)
+    : analytics.clicks_by_day.map((entry) => ({ date: formatDayLabel(entry.date), clicks: entry.clicks }));
+
+  const chartTitle = days <= 7 ? "Clicks 7 ngày qua" : days <= 30 ? `Clicks ${days} ngày qua` : `Clicks ${days} ngày (theo tuần)`;
 
   const countryData = analytics.country_breakdown.map((entry) => {
     const country = COUNTRIES.find((item) => item.code === entry.country_code);
-    return {
-      name: country ? `${country.flag} ${country.code}` : entry.country_code,
-      value: entry.clicks,
-    };
+    return { name: country ? `${country.flag} ${country.code}` : entry.country_code, value: entry.clicks };
   });
 
   const refererData = analytics.referer_breakdown.map((entry) => ({
@@ -85,6 +125,7 @@ export function StatsPanel({ link, analytics, isLoading = false, onBack }: Stats
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          {/* Summary cards — all-time, not filtered by date range */}
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-xl border border-border bg-card p-4">
               <MousePointerClick className="mb-2 h-5 w-5 text-primary" />
@@ -103,10 +144,14 @@ export function StatsPanel({ link, analytics, isLoading = false, onBack }: Stats
             </div>
           </div>
 
+          {/* Date range selector */}
+          <AnalyticsDateRangePicker value={dateRange} onChange={setDateRange} />
+
+          {/* Bar chart — filtered by date range */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <h4 className="mb-4 text-sm font-semibold">Clicks 7 ngày qua</h4>
+            <h4 className="mb-4 text-sm font-semibold">{chartTitle}</h4>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={clicksByDay}>
+              <BarChart data={chartData}>
                 <XAxis dataKey="date" tick={{ fill: "hsl(215, 12%, 50%)", fontSize: 12 }} />
                 <YAxis tick={{ fill: "hsl(215, 12%, 50%)", fontSize: 12 }} />
                 <Tooltip
@@ -122,6 +167,7 @@ export function StatsPanel({ link, analytics, isLoading = false, onBack }: Stats
             </ResponsiveContainer>
           </div>
 
+          {/* Country + referer breakdowns — filtered by date range */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-border bg-card p-4">
               <h4 className="mb-4 text-sm font-semibold">Theo quốc gia</h4>

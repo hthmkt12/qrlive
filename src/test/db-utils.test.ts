@@ -10,7 +10,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { supabase } from "@/integrations/supabase/client";
-import { fetchLinkAnalyticsDetail, fetchLinkAnalyticsSummaries, fetchLinks, getRedirectUrl } from "@/lib/db";
+import { fetchLinkAnalyticsDetail, fetchLinkAnalyticsDetailV2, fetchLinkAnalyticsSummaries, fetchLinks, getRedirectUrl } from "@/lib/db";
+import { QUERY_KEYS } from "@/lib/query-keys";
 
 // ─── getRedirectUrl ───────────────────────────────────────────────────────────
 
@@ -193,5 +194,117 @@ describe("custom short code format contract", () => {
     expect(CUSTOM_CODE_PATTERN.test("AB 123")).toBe(false);
     expect(CUSTOM_CODE_PATTERN.test("AB.123")).toBe(false);
     expect(CUSTOM_CODE_PATTERN.test("AB@123")).toBe(false);
+  });
+});
+
+// ─── fetchLinkAnalyticsDetailV2 ───────────────────────────────────────────────
+
+describe("fetchLinkAnalyticsDetailV2", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls get_link_click_detail_v2 RPC with link_id and date params", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: [
+        {
+          link_id: "link-1",
+          total_clicks: "10",
+          today_clicks: "3",
+          countries_count: "2",
+          clicks_by_day: [{ date: "2026-03-10", clicks: "5" }],
+          country_breakdown: [{ country_code: "VN", clicks: "8" }],
+          referer_breakdown: [{ referer: "direct", clicks: "10" }],
+        },
+      ],
+      error: null,
+    } as never);
+
+    const result = await fetchLinkAnalyticsDetailV2("link-1", "2026-03-10", "2026-03-16");
+
+    expect(supabase.rpc).toHaveBeenCalledWith("get_link_click_detail_v2", {
+      p_link_id: "link-1",
+      p_start_date: "2026-03-10",
+      p_end_date: "2026-03-16",
+    });
+    expect(result.total_clicks).toBe(10);
+    expect(result.clicks_by_day).toEqual([{ date: "2026-03-10", clicks: 5 }]);
+  });
+
+  it("calls RPC without date params when not provided", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null } as never);
+
+    await fetchLinkAnalyticsDetailV2("link-2");
+
+    expect(supabase.rpc).toHaveBeenCalledWith("get_link_click_detail_v2", {
+      p_link_id: "link-2",
+    });
+  });
+
+  it("returns empty payload when RPC returns no rows", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null } as never);
+
+    const result = await fetchLinkAnalyticsDetailV2("link-1", "2026-03-01", "2026-03-31");
+
+    expect(result).toEqual({
+      link_id: "link-1",
+      total_clicks: 0,
+      today_clicks: 0,
+      countries_count: 0,
+      clicks_by_day: [],
+      country_breakdown: [],
+      referer_breakdown: [],
+    });
+  });
+
+  it("normalizes numeric strings from RPC response", async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: [
+        {
+          link_id: "link-1",
+          total_clicks: "42",
+          today_clicks: "7",
+          countries_count: "3",
+          clicks_by_day: [],
+          country_breakdown: [],
+          referer_breakdown: [],
+        },
+      ],
+      error: null,
+    } as never);
+
+    const result = await fetchLinkAnalyticsDetailV2("link-1");
+
+    expect(result.total_clicks).toBe(42);
+    expect(result.today_clicks).toBe(7);
+    expect(result.countries_count).toBe(3);
+  });
+});
+
+// ─── QUERY_KEYS.analytics.detailV2 ───────────────────────────────────────────
+
+describe("QUERY_KEYS.analytics.detailV2", () => {
+  it("includes link id and date params in cache key", () => {
+    const key = QUERY_KEYS.analytics.detailV2("link-1", "2026-03-01", "2026-03-31");
+    expect(key).toContain("link-1");
+    expect(key).toContain("2026-03-01");
+    expect(key).toContain("2026-03-31");
+  });
+
+  it("uses 'default' placeholder when dates are omitted", () => {
+    const key = QUERY_KEYS.analytics.detailV2("link-1");
+    expect(key).toContain("default");
+  });
+
+  it("produces different keys for different date ranges", () => {
+    const key7d = QUERY_KEYS.analytics.detailV2("link-1", "2026-03-10", "2026-03-16");
+    const key30d = QUERY_KEYS.analytics.detailV2("link-1", "2026-02-15", "2026-03-16");
+    expect(key7d).not.toEqual(key30d);
+  });
+
+  it("produces different keys for different link ids", () => {
+    const keyA = QUERY_KEYS.analytics.detailV2("link-A", "2026-03-10", "2026-03-16");
+    const keyB = QUERY_KEYS.analytics.detailV2("link-B", "2026-03-10", "2026-03-16");
+    expect(keyA).not.toEqual(keyB);
   });
 });

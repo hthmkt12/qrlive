@@ -14,6 +14,7 @@ export {
   fetchLinks,
   fetchLinkAnalyticsSummaries,
   fetchLinkAnalyticsDetail,
+  fetchLinkAnalyticsDetailV2,
 } from "./db/queries";
 
 export {

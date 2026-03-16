@@ -7,6 +7,11 @@ import { QRLinkRow, LinkAnalyticsDetailRow } from "@/lib/db";
 
 // ─── Mock dependencies ────────────────────────────────────────────────────────
 
+// Mock useLinkAnalyticsDetailV2 so StatsPanel renders with fallback analytics prop
+vi.mock("@/hooks/use-links", () => ({
+  useLinkAnalyticsDetailV2: () => ({ data: undefined, isLoading: false }),
+}));
+
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
@@ -17,6 +22,16 @@ vi.mock("@/components/QRPreview", () => ({
   QRPreview: ({ url, shortCode, name }: any) => (
     <div data-testid="qr-preview">
       QRPreview: {shortCode}
+    </div>
+  ),
+}));
+
+vi.mock("@/components/analytics-date-range-picker", () => ({
+  AnalyticsDateRangePicker: ({ value, onChange }: any) => (
+    <div data-testid="date-range-picker">
+      <button onClick={() => onChange({ startDate: value.startDate, endDate: value.endDate })}>
+        date-range
+      </button>
     </div>
   ),
 }));
