@@ -2,6 +2,80 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project: QRLive — Dynamic QR Code Link Shortener
+
+React 18 + TypeScript + Vite frontend with Supabase backend (Auth, Postgres, Edge Functions on Deno). Deployed to Vercel (frontend) + Supabase (backend). UI is Vietnamese-localized.
+
+## Key Commands
+
+```bash
+npm run dev          # Vite dev server at http://localhost:5173
+npm run build        # Production build
+npm run typecheck    # TypeScript type checking (no emit)
+npm run lint         # ESLint
+npm run test         # Vitest test suite (199 tests)
+npm run test:watch   # Watch mode
+
+# Supabase edge functions
+supabase functions deploy redirect --no-verify-jwt
+
+# Proxy gateway (optional bypass feature)
+npm run gateway:dev
+npm run gateway:test
+```
+
+Run a single test file: `npx vitest run src/test/schemas.test.ts`
+
+## Architecture
+
+### Data Flow
+
+```
+Browser → Vercel (React SPA) → Supabase (Auth + DB)
+QR scan → Supabase Edge Function (redirect/{shortCode}) → 302 to target URL
+```
+
+### Frontend Structure
+
+- **`src/App.tsx`** — root with providers: ThemeProvider, QueryClientProvider, AuthProvider, BrowserRouter. Three routes: `/auth`, `/` (protected), `*` (NotFound).
+- **`src/contexts/auth-context.tsx`** — Supabase Auth session management; resolves loading state to prevent flash.
+- **`src/hooks/use-links.ts`** — TanStack Query hook fetching `qr_links` with analytics summaries.
+- **`src/hooks/use-link-mutations.ts`** — create/update/delete mutations with query invalidation.
+- **`src/lib/db.ts`** — barrel re-export; actual logic split into:
+  - `src/lib/db/models.ts` — TypeScript interfaces (QRLinkRow, GeoRouteRow, ClickEventRow, analytics rows)
+  - `src/lib/db/queries.ts` — read operations (fetchLinks, fetchLinkAnalyticsSummaries, fetchLinkAnalyticsDetail)
+  - `src/lib/db/mutations.ts` — write operations (createLinkInDB, updateLinkInDB, updateGeoRoutesInDB, deleteLinkInDB, generateShortCode)
+  - `src/lib/db/utils.ts` — getRedirectUrl, normalizeAnalyticsRows
+- **`src/lib/schemas.ts`** — Zod schemas for form validation (link creation/editing, auth).
+- **`src/lib/query-keys.ts`** — centralized TanStack Query key factory.
+
+### Edge Function (`supabase/functions/redirect/index.ts`)
+
+Deno runtime. Handles all QR code redirect requests:
+1. Validates short code format (`^[A-Z0-9_-]{3,20}$`)
+2. Checks link expiration (`expires_at`)
+3. Serves password form (GET) or verifies password hash (POST) for protected links — SHA-256 with salt
+4. Determines redirect target: `bypass_url → geo target_url → default_url` (country via `cf-ipcountry` header)
+5. Rate-limits clicks (1 per IP per 60s), filters bots, records click events
+6. Returns 302 with `Cache-Control: no-store`
+
+Uses service role key (bypasses RLS) for `click_events` INSERT.
+
+### Database Schema (Supabase Postgres)
+
+- `qr_links` — user's links (short_code, default_url, is_active, expires_at, password_hash, password_salt)
+- `geo_routes` — per-link country routing (country_code, target_url, bypass_url)
+- `click_events` — analytics raw events (link_id, country_code, ip_address, referer, user_agent)
+- RLS on all tables; owner-only access for user data; service role for click_events INSERT
+- Atomic geo route updates via Postgres RPC function (`update_geo_routes`)
+- Analytics via server-side RPCs: `get_link_click_summaries`, `get_link_click_detail`
+
+### Password Protection
+
+- Client: `src/lib/password-utils.ts` — Web Crypto API SHA-256 hashing for form submission
+- Edge function: hashes submitted password and compares to stored `password_hash`
+- `password_hash` / `password_salt` never returned to frontend by `fetchLinks`
+
 ## Role & Responsibilities
 
 Your role is to analyze user requirements, delegate tasks to appropriate sub-agents, and ensure cohesive delivery of features that meet specifications and architectural standards.
