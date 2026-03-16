@@ -11,12 +11,12 @@ import type {
 export async function fetchLinks(): Promise<QRLinkRow[]> {
   const { data, error } = await supabase
     .from("qr_links")
-    // password_hash included (null check drives lock icon); password_salt excluded (never needed client-side)
-    .select("id, user_id, name, short_code, default_url, is_active, created_at, expires_at, password_hash, geo_routes(*)")
+    // has_password is a server-side generated column — password_hash is never selected here
+    .select("id, user_id, name, short_code, default_url, is_active, created_at, expires_at, has_password, geo_routes(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data as QRLinkRow[]) || [];
+  return (data ?? []) as unknown as QRLinkRow[];
 }
 
 export async function fetchLinkAnalyticsSummaries(

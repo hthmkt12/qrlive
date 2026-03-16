@@ -1,4 +1,4 @@
-import { hashPassword } from "@/lib/password-utils";
+import { verifyPassword } from "@/lib/password-utils";
 
 /**
  * Redirect edge function simulator
@@ -87,6 +87,8 @@ export function resolveTarget(
 /**
  * Simulates redirect edge function behavior
  * Tests all flows: normal redirect, password protection, geo-routing, expiry check
+ *
+ * Uses the shared verifyPassword() which supports both PBKDF2 and legacy SHA-256.
  */
 export async function simulateRedirectFunction(
   shortCode: string,
@@ -128,11 +130,11 @@ export async function simulateRedirectFunction(
     };
   }
 
-  // Password protection
+  // Password protection — supports both PBKDF2 and legacy SHA-256 hashes
   if (mockLink.password_hash) {
     if (method === "POST" && formData) {
       const isValid = formData.password !== "" &&
-        (await hashPassword(formData.password, mockLink.password_salt || "")) === mockLink.password_hash;
+        await verifyPassword(formData.password, mockLink.password_hash, mockLink.password_salt);
 
       if (!isValid) {
         const errorForm = buildPasswordForm(shortCode, "Mật khẩu không đúng. Vui lòng thử lại.");

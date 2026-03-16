@@ -31,8 +31,7 @@ const mockLinks = [
     is_active: true,
     created_at: "2026-03-15T00:00:00Z",
     expires_at: null,
-    password_hash: null,
-    password_salt: null,
+    has_password: false,
     geo_routes: [{ id: "r1", link_id: "link-1", country: "Vietnam", country_code: "VN", target_url: "https://vn.example.com" }],
   },
 ];
@@ -85,7 +84,7 @@ function renderIndex() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Index />
       </BrowserRouter>
     </QueryClientProvider>

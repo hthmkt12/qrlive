@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { hashPassword } from "@/lib/password-utils";
 import {
   simulateRedirectFunction,
@@ -6,6 +6,15 @@ import {
   resolveTarget,
   MockLink,
 } from "./redirect-simulator";
+
+// Legacy SHA-256 helper — produces old-format hashes for backward-compat tests
+async function legacyHashSHA256(password: string, salt: string): Promise<string> {
+  const data = new TextEncoder().encode(salt + password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 describe("Redirect Function Flows", () => {
   describe("Normal Redirect", () => {
@@ -119,22 +128,15 @@ describe("Redirect Function Flows", () => {
     });
   });
 
-  describe("Password-Protected Links", () => {
-    let passwordSalt: string;
-    let passwordHash: string;
-
-    beforeEach(async () => {
-      passwordSalt = "test-salt-12345";
-      passwordHash = await hashPassword("correct-password", passwordSalt);
-    });
-
+  describe("Password-Protected Links (PBKDF2)", () => {
     it("GET on password-protected link returns 200 with HTML form", async () => {
+      const passwordHash = await hashPassword("correct-password");
       const mockLink: MockLink = {
         id: "1",
         short_code: "PROTECTED",
         default_url: "https://example.com",
         password_hash: passwordHash,
-        password_salt: passwordSalt,
+        password_salt: null,
         is_active: true,
       };
       const res = await simulateRedirectFunction("PROTECTED", mockLink, "GET");
@@ -144,12 +146,13 @@ describe("Redirect Function Flows", () => {
     });
 
     it("password form includes required fields", async () => {
+      const passwordHash = await hashPassword("correct-password");
       const mockLink: MockLink = {
         id: "1",
         short_code: "PROTECTED",
         default_url: "https://example.com",
         password_hash: passwordHash,
-        password_salt: passwordSalt,
+        password_salt: null,
         is_active: true,
       };
       const res = await simulateRedirectFunction("PROTECTED", mockLink, "GET");
@@ -159,12 +162,13 @@ describe("Redirect Function Flows", () => {
     });
 
     it("POST with wrong password returns 401 with error message", async () => {
+      const passwordHash = await hashPassword("correct-password");
       const mockLink: MockLink = {
         id: "1",
         short_code: "PROTECTED",
         default_url: "https://example.com",
         password_hash: passwordHash,
-        password_salt: passwordSalt,
+        password_salt: null,
         is_active: true,
       };
       const res = await simulateRedirectFunction("PROTECTED", mockLink, "POST", {
@@ -175,12 +179,13 @@ describe("Redirect Function Flows", () => {
     });
 
     it("POST with correct password redirects with 302", async () => {
+      const passwordHash = await hashPassword("correct-password");
       const mockLink: MockLink = {
         id: "1",
         short_code: "PROTECTED",
         default_url: "https://example.com",
         password_hash: passwordHash,
-        password_salt: passwordSalt,
+        password_salt: null,
         is_active: true,
       };
       const res = await simulateRedirectFunction("PROTECTED", mockLink, "POST", {
@@ -190,23 +195,54 @@ describe("Redirect Function Flows", () => {
       expect(res.headers["location"]).toBe("https://example.com");
     });
 
-    it("password hash is deterministic with same salt", async () => {
-      const hash1 = await hashPassword("test-password", "fixed-salt");
-      const hash2 = await hashPassword("test-password", "fixed-salt");
-      expect(hash1).toBe(hash2);
-    });
-
     it("empty password submission treated as wrong password", async () => {
+      const passwordHash = await hashPassword("correct-password");
       const mockLink: MockLink = {
         id: "1",
         short_code: "PROTECTED",
         default_url: "https://example.com",
         password_hash: passwordHash,
-        password_salt: passwordSalt,
+        password_salt: null,
         is_active: true,
       };
       const res = await simulateRedirectFunction("PROTECTED", mockLink, "POST", {
         password: "",
+      });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe("Password-Protected Links (legacy SHA-256 backward compat)", () => {
+    it("POST with correct password and legacy hash redirects with 302", async () => {
+      const salt = "legacy-salt-123";
+      const hash = await legacyHashSHA256("correct-password", salt);
+      const mockLink: MockLink = {
+        id: "1",
+        short_code: "LEGACY",
+        default_url: "https://example.com",
+        password_hash: hash,
+        password_salt: salt,
+        is_active: true,
+      };
+      const res = await simulateRedirectFunction("LEGACY", mockLink, "POST", {
+        password: "correct-password",
+      });
+      expect(res.status).toBe(302);
+    });
+
+    it("POST with wrong password and legacy hash returns 401", async () => {
+      const salt = "legacy-salt-456";
+      const hash = await legacyHashSHA256("correct-password", salt);
+      const mockLink: MockLink = {
+        id: "1",
+        short_code: "LEGACY",
+        default_url: "https://example.com",
+        password_hash: hash,
+        password_salt: salt,
+        is_active: true,
+      };
+      const res = await simulateRedirectFunction("LEGACY", mockLink, "POST", {
+        password: "wrong",
       });
       expect(res.status).toBe(401);
     });
@@ -396,25 +432,27 @@ describe("Redirect Function Flows", () => {
     });
   });
 
-  describe("Password Hash Compatibility", () => {
-    it("frontend and edge function use same hashing algorithm", async () => {
-      // Both use SHA-256 with salt prefix: salt + password
-      const salt = "test-salt";
-      const password = "test-password";
-      const hash = await hashPassword(password, salt);
-      // Should be 64-char hex (SHA-256)
-      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  describe("Password Hash Format", () => {
+    it("PBKDF2 hash is self-describing with iterations and embedded salt", async () => {
+      const hash = await hashPassword("test-password");
+      expect(hash).toMatch(/^pbkdf2:sha256:\d+:.+:.+$/);
     });
 
-    it("hash is reproducible with same salt and password", async () => {
-      const h1 = await hashPassword("secret", "salt");
-      const h2 = await hashPassword("secret", "salt");
-      expect(h1).toBe(h2);
+    it("PBKDF2 hash uses 600000 iterations (OWASP 2023)", async () => {
+      const hash = await hashPassword("test-password");
+      const parts = hash.split(":");
+      expect(parts[2]).toBe("600000");
     });
 
-    it("different salts produce different hashes", async () => {
-      const h1 = await hashPassword("same-password", "salt-1");
-      const h2 = await hashPassword("same-password", "salt-2");
+    it("different passwords produce different PBKDF2 hashes", async () => {
+      const h1 = await hashPassword("password-1");
+      const h2 = await hashPassword("password-2");
+      expect(h1).not.toBe(h2);
+    });
+
+    it("same password produces different hashes (random salt)", async () => {
+      const h1 = await hashPassword("same-password");
+      const h2 = await hashPassword("same-password");
       expect(h1).not.toBe(h2);
     });
   });
@@ -435,14 +473,13 @@ describe("Redirect Function Flows", () => {
     });
 
     it("password flow: GET form → POST password → 302 redirect", async () => {
-      const salt = "test-salt";
-      const hash = await hashPassword("secret", salt);
+      const hash = await hashPassword("secret");
       const mockLink: MockLink = {
         id: "1",
         short_code: "PASS",
         default_url: "https://example.com",
         password_hash: hash,
-        password_salt: salt,
+        password_salt: null,
         is_active: true,
       };
       // Step 1: GET form
@@ -482,8 +519,7 @@ describe("Redirect Function Flows", () => {
     });
 
     it("expired + password protected: shows expiry not form", async () => {
-      const salt = "salt";
-      const hash = await hashPassword("pass", salt);
+      const hash = await hashPassword("pass");
       const pastDate = new Date(Date.now() - 86400000).toISOString();
       const mockLink: MockLink = {
         id: "1",
@@ -491,7 +527,7 @@ describe("Redirect Function Flows", () => {
         default_url: "https://example.com",
         expires_at: pastDate,
         password_hash: hash,
-        password_salt: salt,
+        password_salt: null,
         is_active: true,
       };
       const res = await simulateRedirectFunction("EXPIRED-PASS", mockLink);

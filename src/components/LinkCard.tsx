@@ -85,7 +85,7 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
             <div>
               <h3 className="font-semibold text-foreground flex items-center gap-1.5">
                 {link.name}
-                {link.password_hash && (
+                {link.has_password && (
                   <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" title="Link được bảo vệ bằng mật khẩu" />
                 )}
               </h3>

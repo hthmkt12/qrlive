@@ -46,8 +46,7 @@ const mockLink: QRLinkRow = {
   created_at: "2026-03-16T00:00:00Z",
   expires_at: null,
   geo_routes: [],
-  password_hash: null,
-  password_salt: null,
+  has_password: false,
 };
 
 const mockAnalytics: LinkAnalyticsSummaryRow = {

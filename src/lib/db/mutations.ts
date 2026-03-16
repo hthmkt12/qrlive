@@ -1,7 +1,7 @@
 // Write operations: create, update, delete links and geo routes in Supabase
 
 import { supabase } from "@/integrations/supabase/client";
-import { hashPassword, generateSalt } from "@/lib/password-utils";
+import { hashPassword } from "@/lib/password-utils";
 import type { QRLinkRow } from "./models";
 
 /** Generate a 6-char alphanumeric short code, retrying up to 5 times on collision */
@@ -48,12 +48,10 @@ export async function createLinkInDB(
     shortCode = await generateShortCode();
   }
 
-  // Hash password if provided
+  // Hash password if provided (PBKDF2 — salt is embedded in the hash string)
   let passwordHash: string | null = null;
-  let passwordSalt: string | null = null;
   if (password && password.trim() !== "") {
-    passwordSalt = generateSalt();
-    passwordHash = await hashPassword(password, passwordSalt);
+    passwordHash = await hashPassword(password);
   }
 
   const { data: link, error } = await supabase
@@ -65,7 +63,7 @@ export async function createLinkInDB(
       user_id: userId,
       expires_at: expiresAt || null,
       password_hash: passwordHash,
-      password_salt: passwordSalt,
+      password_salt: null,
     })
     .select()
     .single();
@@ -108,10 +106,9 @@ export async function updateLinkInDB(
     // Explicit clear: remove password protection
     passwordFields = { password_hash: null, password_salt: null };
   } else if (password && password.trim() !== "") {
-    // New password provided: hash and store
-    const salt = generateSalt();
-    const hash = await hashPassword(password, salt);
-    passwordFields = { password_hash: hash, password_salt: salt };
+    // New password provided: PBKDF2 hash (salt embedded in hash string)
+    const hash = await hashPassword(password);
+    passwordFields = { password_hash: hash, password_salt: null };
   }
 
   const payload = passwordFields ? { ...updates, ...passwordFields } : updates;

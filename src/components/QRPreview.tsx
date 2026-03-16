@@ -1,7 +1,8 @@
 import { QRCodeSVG } from "qrcode.react";
 import { motion } from "framer-motion";
-import { Download, Copy, Check } from "lucide-react";
+import { Download, Copy, Check, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getRedirectUrl } from "@/lib/db";
@@ -24,11 +25,22 @@ const PRESETS = [
   { label: "Xanh lá", fg: "#22c55e", bg: "#0a1f0f" },
 ] as const;
 
+// Border style presets for QR container
+const BORDER_STYLES = [
+  { label: "Glow",      className: "rounded-xl border border-border bg-card p-6 glow-primary" },
+  { label: "Không",     className: "p-4 bg-transparent" },
+  { label: "Đậm",       className: "rounded-xl border-2 border-primary bg-card p-6" },
+  { label: "Đổ bóng",  className: "rounded-2xl border border-border bg-card p-6 shadow-xl shadow-primary/20" },
+] as const;
+
 export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
   const [copied, setCopied] = useState(false);
   const [fgColor, setFgColor] = useState(PRESETS[0].fg);
   const [bgColor, setBgColor] = useState(PRESETS[0].bg);
   const [errorLevel, setErrorLevel] = useState<ErrorLevel>("H");
+  const [borderStyle, setBorderStyle] = useState(BORDER_STYLES[0].className);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [showLogoInput, setShowLogoInput] = useState(false);
   const { toast } = useToast();
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -64,13 +76,18 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
 
   const activePreset = PRESETS.find((p) => p.fg === fgColor && p.bg === bgColor);
 
+  // Logo image settings — only applied when URL is provided; use error level H for better logo coverage
+  const imageSettings = logoUrl
+    ? { src: logoUrl, height: 40, width: 40, excavate: true }
+    : undefined;
+
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className="flex flex-col items-center gap-4"
     >
-      <div ref={qrRef} className="rounded-xl border border-border bg-card p-6 glow-primary">
+      <div ref={qrRef} className={borderStyle}>
         <QRCodeSVG
           value={wrapperUrl}
           size={200}
@@ -78,6 +95,7 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
           fgColor={fgColor}
           level={errorLevel}
           includeMargin={false}
+          imageSettings={imageSettings}
         />
       </div>
 
@@ -132,6 +150,58 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
             <option value="H">Mức H</option>
           </select>
         </div>
+
+        {/* Border style selector */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="shrink-0">Viền:</span>
+          {BORDER_STYLES.map((b) => (
+            <button
+              key={b.label}
+              onClick={() => setBorderStyle(b.className)}
+              className={cn(
+                "px-2 py-0.5 rounded border text-xs transition-colors",
+                borderStyle === b.className
+                  ? "border-primary text-primary bg-primary/10"
+                  : "border-border hover:border-primary/50"
+              )}
+            >
+              {b.label}
+            </button>
+          ))}
+          {/* Logo toggle */}
+          <button
+            onClick={() => setShowLogoInput((v) => !v)}
+            className={cn(
+              "ml-auto flex items-center gap-1 px-2 py-0.5 rounded border text-xs transition-colors",
+              showLogoInput
+                ? "border-primary text-primary bg-primary/10"
+                : "border-border hover:border-primary/50"
+            )}
+            title="Thêm logo vào giữa QR"
+          >
+            <Image className="h-3 w-3" /> Logo
+          </button>
+        </div>
+
+        {/* Logo URL input — shown when toggle is active */}
+        {showLogoInput && (
+          <div className="flex gap-2 items-center">
+            <Input
+              placeholder="URL logo (https://...)"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              className="h-7 text-xs"
+            />
+            {logoUrl && (
+              <button
+                onClick={() => setLogoUrl("")}
+                className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+              >
+                Xóa
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="w-full rounded-lg border border-border bg-secondary/50 p-3">

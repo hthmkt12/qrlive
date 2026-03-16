@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock password-utils before importing mutations
 vi.mock("@/lib/password-utils", () => ({
-  hashPassword: vi.fn().mockResolvedValue("hashed-password-abc123"),
-  generateSalt: vi.fn().mockReturnValue("generated-salt-xyz"),
+  hashPassword: vi.fn().mockResolvedValue("pbkdf2:sha256:600000:bW9jay1zYWx0:bW9jay1oYXNo"),
 }));
 
 // Mock Supabase client
@@ -16,7 +15,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { supabase } from "@/integrations/supabase/client";
-import { hashPassword, generateSalt } from "@/lib/password-utils";
+import { hashPassword } from "@/lib/password-utils";
 import {
   generateShortCode,
   createLinkInDB,
@@ -185,12 +184,11 @@ describe("createLinkInDB", () => {
 
     await createLinkInDB("Test", "https://example.com", [], "user-1", undefined, undefined, "secret");
 
-    expect(generateSalt).toHaveBeenCalled();
-    expect(hashPassword).toHaveBeenCalledWith("secret", "generated-salt-xyz");
+    expect(hashPassword).toHaveBeenCalledWith("secret");
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        password_hash: "hashed-password-abc123",
-        password_salt: "generated-salt-xyz",
+        password_hash: "pbkdf2:sha256:600000:bW9jay1zYWx0:bW9jay1oYXNo",
+        password_salt: null,
       })
     );
   });
@@ -215,7 +213,7 @@ describe("createLinkInDB", () => {
 
     await createLinkInDB("Test", "https://example.com", [], "user-1");
 
-    expect(generateSalt).not.toHaveBeenCalled();
+    expect(hashPassword).not.toHaveBeenCalled();
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         password_hash: null,
@@ -325,12 +323,11 @@ describe("updateLinkInDB", () => {
 
     await updateLinkInDB("link-1", { name: "Test" }, "new-password");
 
-    expect(generateSalt).toHaveBeenCalled();
-    expect(hashPassword).toHaveBeenCalledWith("new-password", "generated-salt-xyz");
+    expect(hashPassword).toHaveBeenCalledWith("new-password");
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
-        password_hash: "hashed-password-abc123",
-        password_salt: "generated-salt-xyz",
+        password_hash: "pbkdf2:sha256:600000:bW9jay1zYWx0:bW9jay1oYXNo",
+        password_salt: null,
       })
     );
   });

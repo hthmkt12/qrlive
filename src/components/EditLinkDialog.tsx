@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -104,6 +104,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
       <DialogContent className="sm:max-w-lg bg-card border-border">
         <DialogHeader>
           <DialogTitle className="text-xl">Chỉnh sửa link</DialogTitle>
+          <DialogDescription>Cập nhật thông tin, mật khẩu hoặc chuyển hướng theo quốc gia.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
@@ -136,10 +137,10 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
             </Label>
             <Input
               type="password"
-              placeholder={link.password_hash ? "••••••••  (nhập mật khẩu mới hoặc để trống để xóa)" : "Để trống nếu không cần mật khẩu"}
+              placeholder={link.has_password ? "••••••••  (nhập mật khẩu mới hoặc để trống để xóa)" : "Để trống nếu không cần mật khẩu"}
               {...register("linkPassword")}
             />
-            {link.password_hash && (
+            {link.has_password && (
               <p className="text-xs text-muted-foreground">
                 Link đang được bảo vệ bằng mật khẩu. Để trống để xóa mật khẩu.
               </p>
