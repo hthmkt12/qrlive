@@ -1,6 +1,7 @@
 // Write operations: create, update, delete links and geo routes in Supabase
 
 import { supabase } from "@/integrations/supabase/client";
+import { hashPassword, generateSalt } from "@/lib/password-utils";
 import type { QRLinkRow } from "./models";
 
 /** Generate a 6-char alphanumeric short code, retrying up to 5 times on collision */
@@ -24,7 +25,8 @@ export async function createLinkInDB(
   geoRoutes: { country: string; countryCode: string; targetUrl: string; bypassUrl?: string }[],
   userId: string,
   customShortCode?: string,
-  expiresAt?: string | null
+  expiresAt?: string | null,
+  password?: string
 ): Promise<QRLinkRow> {
   let shortCode: string;
 
@@ -46,6 +48,14 @@ export async function createLinkInDB(
     shortCode = await generateShortCode();
   }
 
+  // Hash password if provided
+  let passwordHash: string | null = null;
+  let passwordSalt: string | null = null;
+  if (password && password.trim() !== "") {
+    passwordSalt = generateSalt();
+    passwordHash = await hashPassword(password, passwordSalt);
+  }
+
   const { data: link, error } = await supabase
     .from("qr_links")
     .insert({
@@ -54,6 +64,8 @@ export async function createLinkInDB(
       default_url: defaultUrl,
       user_id: userId,
       expires_at: expiresAt || null,
+      password_hash: passwordHash,
+      password_salt: passwordSalt,
     })
     .select()
     .single();
@@ -87,9 +99,23 @@ export async function createLinkInDB(
 
 export async function updateLinkInDB(
   id: string,
-  updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null }
+  updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null },
+  password?: string // undefined = no change; "" = clear password; non-empty = set new password
 ) {
-  const { error } = await supabase.from("qr_links").update(updates).eq("id", id);
+  // Build password fields based on the password param
+  let passwordFields: { password_hash: string | null; password_salt: string | null } | undefined;
+  if (password === "") {
+    // Explicit clear: remove password protection
+    passwordFields = { password_hash: null, password_salt: null };
+  } else if (password && password.trim() !== "") {
+    // New password provided: hash and store
+    const salt = generateSalt();
+    const hash = await hashPassword(password, salt);
+    passwordFields = { password_hash: hash, password_salt: salt };
+  }
+
+  const payload = passwordFields ? { ...updates, ...passwordFields } : updates;
+  const { error } = await supabase.from("qr_links").update(payload).eq("id", id);
   if (error) throw error;
 }
 

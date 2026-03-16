@@ -10,6 +10,9 @@ export interface QRLinkRow {
   created_at: string;
   expires_at: string | null;
   geo_routes: GeoRouteRow[];
+  // Password protection — hash/salt stored server-side; never returned to frontend by fetchLinks
+  password_hash: string | null;
+  password_salt: string | null;
 }
 
 export interface GeoRouteRow {

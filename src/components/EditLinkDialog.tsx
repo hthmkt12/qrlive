@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Globe, Trash2, Save } from "lucide-react";
+import { Plus, Globe, Trash2, Save, Lock } from "lucide-react";
 import { COUNTRIES } from "@/lib/types";
 import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
 import { QRLinkRow } from "@/lib/db";
@@ -47,6 +47,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
         name: link.name,
         defaultUrl: link.default_url,
         expiresAt,
+        linkPassword: "",
         geoRoutes: (link.geo_routes || []).map((r) => ({
           country: r.country,
           countryCode: r.country_code,
@@ -68,7 +69,13 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
     try {
       // Convert YYYY-MM-DD to end-of-day ISO string, or null to clear expiration
       const expires_at = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59`).toISOString() : null;
-      await updateLink.mutateAsync({ id: link.id, updates: { name: data.name, default_url: data.defaultUrl, expires_at } });
+      // Pass linkPassword through: "" clears existing password; non-empty sets new; undefined = no change
+      // Note: empty string is intentional — it signals "clear the password"
+      await updateLink.mutateAsync({
+        id: link.id,
+        updates: { name: data.name, default_url: data.defaultUrl, expires_at },
+        password: data.linkPassword,
+      });
       await updateGeoRoutes.mutateAsync({
         linkId: link.id,
         geoRoutes: data.geoRoutes.map((r) => ({
@@ -119,6 +126,29 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
             <Label>Ngày hết hạn <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span></Label>
             <Input type="date" {...register("expiresAt")} />
           </div>
+
+          {/* Password protection — optional */}
+          <div className="space-y-1">
+            <Label className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              Mật khẩu bảo vệ
+              <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span>
+            </Label>
+            <Input
+              type="password"
+              placeholder={link.password_hash ? "••••••••  (nhập mật khẩu mới hoặc để trống để xóa)" : "Để trống nếu không cần mật khẩu"}
+              {...register("linkPassword")}
+            />
+            {link.password_hash && (
+              <p className="text-xs text-muted-foreground">
+                Link đang được bảo vệ bằng mật khẩu. Để trống để xóa mật khẩu.
+              </p>
+            )}
+            {errors.linkPassword && (
+              <p className="text-xs text-destructive">{errors.linkPassword.message}</p>
+            )}
+          </div>
+
           {/* Geo routes */}
           <div>
             <div className="flex items-center justify-between mb-2">

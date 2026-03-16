@@ -45,6 +45,8 @@ const mockLink: QRLinkRow = {
   created_at: "2026-03-16T00:00:00Z",
   expires_at: null,
   geo_routes: [],
+  password_hash: null,
+  password_salt: null,
 };
 
 const mockLinkWithGeoRoutes: QRLinkRow = {
@@ -126,6 +128,7 @@ describe("EditLinkDialog", () => {
       expect(mockUpdateLink).toHaveBeenCalledWith({
         id: "link-1",
         updates: { name: "Updated Name", default_url: "https://example.com", expires_at: null },
+        password: "",
       });
     });
   });

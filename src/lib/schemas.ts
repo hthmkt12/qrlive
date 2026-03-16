@@ -22,6 +22,8 @@ export const linkFormSchema = z.object({
     .or(z.literal("")),
   // Optional expiration date — ISO date string (YYYY-MM-DD) or empty string = no expiration
   expiresAt: z.string().optional().or(z.literal("")),
+  // Optional link password — min 4 chars if provided; empty string = no password / clear existing
+  linkPassword: z.string().min(4, "Mật khẩu tối thiểu 4 ký tự").max(100, "Mật khẩu quá dài").optional().or(z.literal("")),
 });
 
 // Login / Signup form

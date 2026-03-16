@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Globe, Trash2 } from "lucide-react";
+import { Plus, Globe, Trash2, Lock } from "lucide-react";
 import { COUNTRIES } from "@/lib/types";
 import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +28,7 @@ export function CreateLinkDialog() {
     formState: { errors, isSubmitting },
   } = useForm<LinkFormInput>({
     resolver: zodResolver(linkFormSchema),
-    defaultValues: { name: "", defaultUrl: "", geoRoutes: [], customShortCode: "" },
+    defaultValues: { name: "", defaultUrl: "", geoRoutes: [], customShortCode: "", linkPassword: "" },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "geoRoutes" });
@@ -58,6 +58,7 @@ export function CreateLinkDialog() {
         userId: user.id,
         customShortCode: data.customShortCode || undefined,
         expiresAt,
+        password: data.linkPassword || undefined,
       });
       reset();
       setOpen(false);
@@ -130,6 +131,23 @@ export function CreateLinkDialog() {
             <Label>Ngày hết hạn <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span></Label>
             <Input type="date" {...register("expiresAt")} />
           </div>
+          {/* Password protection — optional */}
+          <div className="space-y-1">
+            <Label className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              Mật khẩu bảo vệ
+              <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span>
+            </Label>
+            <Input
+              type="password"
+              placeholder="Để trống nếu không cần mật khẩu"
+              {...register("linkPassword")}
+            />
+            {errors.linkPassword && (
+              <p className="text-xs text-destructive">{errors.linkPassword.message}</p>
+            )}
+          </div>
+
           {/* Geo routes */}
           <div>
             <div className="flex items-center justify-between mb-2">

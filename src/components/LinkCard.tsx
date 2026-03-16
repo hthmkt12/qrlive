@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { BarChart3, Trash2, Edit, ToggleLeft, ToggleRight } from "lucide-react";
+import { BarChart3, Trash2, Edit, ToggleLeft, ToggleRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -83,7 +83,12 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-semibold text-foreground">{link.name}</h3>
+              <h3 className="font-semibold text-foreground flex items-center gap-1.5">
+                {link.name}
+                {link.password_hash && (
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" title="Link được bảo vệ bằng mật khẩu" />
+                )}
+              </h3>
               <p className="font-mono text-xs text-primary truncate">{wrapperUrl}</p>
             </div>
             <div className="flex gap-1">

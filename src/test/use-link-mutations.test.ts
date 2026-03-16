@@ -59,6 +59,8 @@ const mockLink: QRLinkRow = {
   created_at: "2024-01-01T00:00:00Z",
   expires_at: null,
   geo_routes: [],
+  password_hash: null,
+  password_salt: null,
 };
 
 beforeEach(() => {
@@ -89,6 +91,7 @@ describe("useCreateLink", () => {
       [],
       "user-1",
       undefined,
+      undefined,
       undefined
     );
   });
@@ -115,6 +118,7 @@ describe("useCreateLink", () => {
       [],
       "user-1",
       "MYCODE",
+      undefined,
       undefined
     );
   });
@@ -172,7 +176,7 @@ describe("useUpdateLink", () => {
       await result.current.mutateAsync({ id: "link-1", updates: { name: "New Name" } });
     });
 
-    expect(mockUpdateLinkInDB).toHaveBeenCalledWith("link-1", { name: "New Name" });
+    expect(mockUpdateLinkInDB).toHaveBeenCalledWith("link-1", { name: "New Name" }, undefined);
   });
 
   it("invalidates links query on success", async () => {

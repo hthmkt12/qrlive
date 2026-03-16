@@ -58,7 +58,10 @@ const mockLink: QRLinkRow = {
   default_url: "https://example.com",
   is_active: true,
   created_at: "2026-03-16T00:00:00Z",
+  expires_at: null,
   geo_routes: [],
+  password_hash: null,
+  password_salt: null,
 };
 
 const mockAnalyticsDetail: LinkAnalyticsDetailRow = {

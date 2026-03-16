@@ -32,6 +32,7 @@ export function useCreateLink() {
       userId,
       customShortCode,
       expiresAt,
+      password,
     }: {
       name: string;
       defaultUrl: string;
@@ -39,7 +40,8 @@ export function useCreateLink() {
       userId: string;
       customShortCode?: string;
       expiresAt?: string | null;
-    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt),
+      password?: string;
+    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt, password),
     onSuccess: () => {
       invalidateLinks();
       invalidateAnalytics();
@@ -55,10 +57,12 @@ export function useUpdateLink() {
     mutationFn: ({
       id,
       updates,
+      password,
     }: {
       id: string;
       updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null };
-    }) => updateLinkInDB(id, updates),
+      password?: string; // undefined = no change; "" = clear; non-empty = set new
+    }) => updateLinkInDB(id, updates, password),
     onSuccess: invalidate,
   });
 }
