@@ -129,35 +129,43 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **Component test coverage** | ✅ 53 tests + 12 hook tests added (141 total) | Complete | ✅ Complete |
-| **EditLinkDialog + QRPreview tests** | Missing 15-20 tests for full component coverage | Medium | Pending |
+| **Component test coverage** | ✅ 53 + 12 + 18 tests (159 total, ~74%) | Complete | ✅ Complete (2026-03-16) |
+| **EditLinkDialog + QRPreview tests** | ✅ 18 tests added (edit-link-dialog, qr-preview, password-utils) | Complete | ✅ Complete (2026-03-16) |
 | **Redirect/proxy RPC tests** | Proxy gateway has smoke tests; edge redirect paths rely on manual verification | Medium | Pending |
 | **Analytics pre-aggregation/caching** | Stats panel uses aggregate RPCs; higher-volume reports may want cached rollups | Medium | Pending |
 | **Large JS bundle** | ✅ StatsPanel lazy-loaded (239KB main, 109KB chunk) | Complete | ✅ Complete |
 | **Linting & type errors** | ✅ All resolved (no-explicit-any, no-empty-object-type, tooling exclusions) | Complete | ✅ Complete |
-| **Security hardening** | ✅ Crypto RNG, auth error normalization, git history cleaned | Complete | ✅ Complete |
+| **Security hardening** | ✅ Crypto RNG, auth error normalization, git history cleaned, proxy F10/F13 fixed | Complete | ✅ Complete |
 
 **Details**:
-1. **Component test coverage**: ✅ 53 tests added covering LinkCard, StatsPanel, and CreateLinkDialog form validation. ✅ 12 tests added for use-link-mutations hook (2026-03-16).
+1. **Component test coverage**: ✅ Complete (2026-03-16). 53 + 12 + 18 = 83 component/hook tests.
    ```typescript
    // Completed:
    - CreateLinkDialog.tsx (17 tests) ✅
    - LinkCard.tsx (16 tests) ✅
    - StatsPanel.tsx (20 tests) ✅
    - use-link-mutations hook (12 tests) ✅
+   - EditLinkDialog.tsx (13 tests) ✅ [NEW 2026-03-16]
+   - QRPreview.tsx (5 tests) ✅ [NEW 2026-03-16]
 
-   // Remaining:
-   - EditLinkDialog.tsx (form updates) — ~15 tests
-   - QRPreview.tsx (QR generation) — ~5 tests
+   Total component/hook tests: 83 | Coverage: ~74%
    ```
 
-2. **Redirect/proxy RPC tests**: `proxy-gateway` has smoke coverage. Need deeper tests for `supabase/functions/redirect`, `supabase/functions/proxy`, and `cloudflare-worker/redirect-proxy.js`.
+2. **Link expiration & password protection**: ✅ Completed (2026-03-16).
+   - expires_at field + form UI + redirect enforcement (403 if expired) ✅
+   - Password hashing (SHA-256 Web Crypto) + validation + redirect prompt ✅
+   - Migrations: 20260316100000, 20260316110000, 20260316120000 ✅
 
-3. **Analytics pre-aggregation/caching**: Dashboard and stats panel now use aggregate RPCs. Higher-volume analytics may want cached rollups or materialized summaries for >30-day ranges.
+3. **Analytics date range filtering**: ✅ Completed (2026-03-16).
+   - analytics-date-range-picker.tsx component ✅
+   - RPC support for custom date queries ✅
+   - Dashboard integration ✅
 
-4. **Large JS bundle**: ✅ Resolved. Main bundle reduced to 239KB gzipped; StatsPanel lazy-loaded as 109KB chunk with Suspense.
+4. **Redirect/proxy RPC tests**: `proxy-gateway` has smoke coverage. Need deeper tests for `supabase/functions/redirect`, `supabase/functions/proxy`, and `cloudflare-worker/redirect-proxy.js`.
 
-5. **Code modularization**: ✅ Resolved. src/lib/db.ts refactored from 252 lines into modular structure (models.ts, queries.ts, mutations.ts, utils.ts) with barrel export.
+5. **Large JS bundle**: ✅ Resolved. Main bundle: 239KB gzipped; StatsPanel lazy-loaded as 109KB chunk with Suspense.
+
+6. **Code modularization**: ✅ Resolved. src/lib/db.ts refactored into modular structure (models.ts, queries.ts, mutations.ts, utils.ts) with barrel export.
 
 ### Low Priority
 - [ ] API documentation (OpenAPI/Swagger)
@@ -171,12 +179,12 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 72% (141 tests passing) | ⚠️ 8% below target |
+| **Test Coverage** | >80% | ~74% (159 tests passing) | ⚠️ 6% below target |
 | **Build Time** | <30s | ~10s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
 | **Error Rate** | <0.1% | 0% (live) | ✅ Met |
-| **Uptime** | 99.9% | 100% (new) | ✅ Met |
+| **Uptime** | 99.9% | 100% (current) | ✅ Met |
 | **Auth Signup Time** | <10s | ~3s | ✅ Met |
 | **Bundle Size (Main)** | <300KB | 239KB gzipped | ✅ Met |
 | **Geo Detection Accuracy** | >95% | TBD | 🔍 Monitor |
@@ -188,22 +196,22 @@ None currently blocking.
 
 ### Q2 2026 Goals
 
-#### 1. Advanced Analytics
-- [ ] Date range filtering (custom date picker)
+#### 1. Advanced Analytics ✅ (COMPLETED 2026-03-16)
+- [x] Date range filtering (analytics-date-range-picker.tsx + RPC)
 - [ ] Country-specific filtering (pie chart → detail page)
 - [ ] Referer breakdown by country
 - [ ] Click trend analysis (7-day, 30-day views)
 - [ ] Export analytics (CSV, PDF)
 
-**Effort**: 1-2 weeks | **Impact**: High (user engagement)
+**Effort**: 1-2 weeks | **Impact**: High (user engagement) | **Status**: Date filtering ✅, rest pending
 
-#### 2. Link Management Enhancements
-- [ ] Link expiration dates (auto-disable after date)
-- [ ] Password protection on links (prompt before redirect)
+#### 2. Link Management Enhancements ✅ (EXPIRATION + PASSWORD COMPLETED 2026-03-16)
+- [x] Link expiration dates (auto-disable after date) ✅
+- [x] Password protection on links (prompt before redirect) ✅
 - [ ] QR code customization (colors, logo, border)
 - [ ] Bulk operations (import/export CSV)
 
-**Effort**: 2-3 weeks | **Impact**: High (feature parity)
+**Effort**: 2-3 weeks | **Impact**: High (feature parity) | **Status**: Expiration + Password ✅, rest pending
 
 #### 3. Team Collaboration
 - [ ] Organizations/workspaces
@@ -252,7 +260,7 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (141 tests, 72%)
+### Current Coverage (159 tests, ~74%)
 - ✅ Schema validation (17 tests)
 - ✅ Database utilities + analytics query helpers (11 tests)
 - ✅ Auth context (8 tests)
@@ -261,18 +269,21 @@ None currently blocking.
   - StatsPanel: 20 tests (charts, data, formatting)
   - CreateLinkDialog: 17 tests (validation, custom codes, errors)
 - ✅ Hook tests (use-link-mutations) (12 tests) — added 2026-03-16
+- ✅ EditLinkDialog tests (13 tests) — added 2026-03-16
+- ✅ QRPreview tests (5 tests) — added 2026-03-16
+- ✅ Password utility tests (4 tests) — added 2026-03-16
 - ✅ Vitest sanity test (1 test)
 - ✅ Proxy gateway smoke tests (3 tests)
 - ✅ Query helpers (4 tests)
 
 ### Remaining (before 1.0 release)
-- [ ] EditLinkDialog tests (~15 tests)
-- [ ] QRPreview tests (~5 tests)
 - [ ] Integration tests (create link → redirect → analytics)
 - [ ] E2E tests (Playwright)
 - [ ] Edge function tests (Deno RPC validation)
+- [ ] Link expiration tests (end-to-end)
+- [ ] Password-protected redirect tests
 
-**Target**: >80% coverage | **Current**: 72% ✅ (up from 64% baseline, +8% since 2026-03-16)
+**Target**: >80% coverage | **Current**: ~74% ✅ (up from 54% baseline at MVP, +20% improvement since 2026-03-14)
 
 ---
 

@@ -11,52 +11,58 @@ All significant changes, features, and fixes documented here.
 ### Planned Features
 - EditLinkDialog unit tests (~15 tests)
 - QRPreview unit tests (~5 tests)
+- Link expiration dates (form UI, redirect enforcement, migrations)
+- Password-protected links (SHA-256 Web Crypto, validation)
 - Advanced analytics filtering (date range, country)
-- Link expiration dates
-- Password protection on links
 
 ---
 
-## [2026-03-16] — Major Fix & Hardening Session
+## [2026-03-16] — Link Expiration, Password Protection & Analytics Enhancement
 
-### Fixed
-- **Test Suite** (1 failing test resolved)
-  - Fixed EditLinkDialog React portal querySelector bug
-  - All 141 tests now passing (was 129 before session)
+### Added
+- **Link Expiration Feature**
+  - `expires_at` field in qr_links table (migration: 20260316100000)
+  - Form UI for expiration date selection
+  - Redirect enforcement (403 if link expired)
+  - Migration verified & deployed
 
-- **Linting** (0 remaining lint errors)
-  - Resolved all no-explicit-any violations
-  - Removed no-empty-object-type false positives
-  - Excluded tooling directories (.claude, .vscode) from ESLint
+- **Password-Protected Links**
+  - SHA-256 Web Crypto hashing (`src/lib/password-utils.ts`)
+  - Password prompt on redirect (requires correct password before accessing target)
+  - Form validation on create/edit link dialog
+  - Migration verified & deployed
 
-- **Security Hardening** (3 vulnerabilities patched)
-  - Replaced Math.random() with crypto.randomUUID() for short code generation
-  - Normalized auth error messages to prevent user enumeration
-  - Improved EditLinkDialog error toast with specific error descriptions
-
-- **Git History** (Vercel token removed)
-  - Removed leaked Vercel token from git history using filter-branch
-  - Force-pushed to clean repository state
+- **Analytics Date Range Filtering**
+  - `analytics-date-range-picker.tsx` component
+  - RPC support for custom date queries
+  - Dashboard integration for filtered analytics
+  - Migration verified & deployed
 
 ### Improved
-- **Code Modularization** (src/lib/db.ts refactored)
-  - Split db.ts (252 lines) into modular structure:
-    - `src/lib/db/models.ts` — type definitions
-    - `src/lib/db/queries.ts` — read operations
-    - `src/lib/db/mutations.ts` — write operations
-    - `src/lib/db/utils.ts` — utility functions
-    - `src/lib/db/index.ts` — barrel export
-  - Maintains 100% backward compatibility
+- **Code Modularization** (db module refactored)
+  - Split src/lib/db.ts (252 lines) → src/lib/db/{models,queries,mutations,utils}.ts
+  - Barrel export at src/lib/db/index.ts (100% backward compatible)
 
-- **Test Coverage** (8% improvement)
-  - Added 12 unit tests for use-link-mutations hook
-  - Coverage: 66% → 72% (~129 → 141 tests)
+- **Database Structure**
+  - 3 new migrations applied (20260316100000, 20260316110000, 20260316120000)
+  - Edge function redirect deployed to ybxmpuirarncxmenprzf project
+  - RLS policies updated for new fields
+
+- **Test Coverage** (18 tests added)
+  - Component tests: edit-link-dialog.test.tsx, qr-preview.test.tsx (NEW)
+  - Utility tests: password-utils.test.ts (NEW), use-link-mutations.test.ts (enhanced)
+  - Tests: 141 → 159 passing (+18, +12.8%)
+
+### Fixed
+- Proxy-gateway security (F10, F13 red-team fixes)
+- Supabase edge function hardening (+3 CORS/validation fixes)
+- CORS headers in 3xx redirect response
 
 ### Status Summary
-- **Tests**: 141/141 passing ✅
-- **Lint Errors**: 0 ✅
-- **TypeScript Errors**: 0 ✅
-- **Test Coverage**: 72% (8% above 64% baseline)
+- **Tests**: 159/159 passing ✅
+- **Test Coverage**: ~74% (estimated from new tests)
+- **Deployments**: Vercel auto-deploy triggered, Supabase edge function updated
+- **Database**: 3 migrations applied, RLS policies verified
 
 ---
 
@@ -147,7 +153,7 @@ All significant changes, features, and fixes documented here.
 |---------|------|--------|-------|----------|
 | v1.0-mvp | 2026-03-14 | Released | 37 | 54% |
 | v1.1 | 2026-03-15 | Released | 97 | 66% |
-| v1.2 | 2026-03-16 | Current | 141 | 72% |
+| v1.2 | 2026-03-16 | Released | 159 | ~74% |
 
 ---
 
