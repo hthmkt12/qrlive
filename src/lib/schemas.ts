@@ -20,6 +20,8 @@ export const linkFormSchema = z.object({
     .pipe(z.string().regex(/^[A-Z0-9_-]{3,20}$/, "Short code chỉ chứa chữ, số, - hoặc _, 3–20 ký tự"))
     .optional()
     .or(z.literal("")),
+  // Optional expiration date — ISO date string (YYYY-MM-DD) or empty string = no expiration
+  expiresAt: z.string().optional().or(z.literal("")),
 });
 
 // Login / Signup form

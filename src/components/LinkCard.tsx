@@ -51,6 +51,16 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
     ? COUNTRIES.find((c) => c.code === analytics.top_country_code)
     : null;
 
+  // Expiration badge state
+  const now = new Date();
+  const expiresDate = link.expires_at ? new Date(link.expires_at) : null;
+  const isExpired = expiresDate ? expiresDate <= now : false;
+  const expiresLabel = expiresDate
+    ? isExpired
+      ? "Đã hết hạn"
+      : `Hết hạn: ${expiresDate.toLocaleDateString("vi-VN")}`
+    : null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -120,6 +130,18 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
           </div>
 
           <p className="text-xs text-muted-foreground mt-1 truncate">→ {link.default_url}</p>
+
+          {expiresLabel && (
+            <span
+              className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                isExpired
+                  ? "bg-destructive/20 text-destructive"
+                  : "bg-warning/20 text-warning"
+              }`}
+            >
+              {expiresLabel}
+            </span>
+          )}
 
           {link.geo_routes?.length > 0 && (
             <div className="flex gap-1 mt-2 flex-wrap">

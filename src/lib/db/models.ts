@@ -2,12 +2,13 @@
 
 export interface QRLinkRow {
   id: string;
+  user_id: string;
   name: string;
   short_code: string;
   default_url: string;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
+  expires_at: string | null;
   geo_routes: GeoRouteRow[];
 }
 
@@ -18,6 +19,7 @@ export interface GeoRouteRow {
   country_code: string;
   target_url: string;
   bypass_url?: string | null;
+  created_at?: string;
 }
 
 export interface ClickEventRow {

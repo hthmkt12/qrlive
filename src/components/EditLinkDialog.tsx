@@ -41,9 +41,12 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
   // Populate form when a link is selected for editing
   useEffect(() => {
     if (link) {
+      // Convert ISO timestamp to YYYY-MM-DD for <input type="date">
+      const expiresAt = link.expires_at ? link.expires_at.substring(0, 10) : "";
       reset({
         name: link.name,
         defaultUrl: link.default_url,
+        expiresAt,
         geoRoutes: (link.geo_routes || []).map((r) => ({
           country: r.country,
           countryCode: r.country_code,
@@ -63,7 +66,9 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
   const onSubmit = async (data: LinkFormInput) => {
     if (!link) return;
     try {
-      await updateLink.mutateAsync({ id: link.id, updates: { name: data.name, default_url: data.defaultUrl } });
+      // Convert YYYY-MM-DD to end-of-day ISO string, or null to clear expiration
+      const expires_at = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59`).toISOString() : null;
+      await updateLink.mutateAsync({ id: link.id, updates: { name: data.name, default_url: data.defaultUrl, expires_at } });
       await updateGeoRoutes.mutateAsync({
         linkId: link.id,
         geoRoutes: data.geoRoutes.map((r) => ({
@@ -109,6 +114,11 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
             {errors.defaultUrl && <p className="text-xs text-destructive">{errors.defaultUrl.message}</p>}
           </div>
 
+          {/* Expiration date — optional */}
+          <div className="space-y-1">
+            <Label>Ngày hết hạn <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span></Label>
+            <Input type="date" {...register("expiresAt")} />
+          </div>
           {/* Geo routes */}
           <div>
             <div className="flex items-center justify-between mb-2">

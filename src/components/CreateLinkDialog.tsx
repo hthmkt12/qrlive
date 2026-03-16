@@ -45,6 +45,7 @@ export function CreateLinkDialog() {
       return;
     }
     try {
+      const expiresAt = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59`).toISOString() : null;
       await createLink.mutateAsync({
         name: data.name,
         defaultUrl: data.defaultUrl,
@@ -56,6 +57,7 @@ export function CreateLinkDialog() {
         })),
         userId: user.id,
         customShortCode: data.customShortCode || undefined,
+        expiresAt,
       });
       reset();
       setOpen(false);
@@ -123,6 +125,11 @@ export function CreateLinkDialog() {
             )}
           </div>
 
+          {/* Expiration date — optional */}
+          <div className="space-y-1">
+            <Label>Ngày hết hạn <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span></Label>
+            <Input type="date" {...register("expiresAt")} />
+          </div>
           {/* Geo routes */}
           <div>
             <div className="flex items-center justify-between mb-2">

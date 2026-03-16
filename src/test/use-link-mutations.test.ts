@@ -51,12 +51,13 @@ function makeWrapper(queryClient: QueryClient) {
 
 const mockLink: QRLinkRow = {
   id: "link-1",
+  user_id: "user-1",
   name: "Test Link",
   short_code: "ABC123",
   default_url: "https://example.com",
   is_active: true,
   created_at: "2024-01-01T00:00:00Z",
-  updated_at: "2024-01-01T00:00:00Z",
+  expires_at: null,
   geo_routes: [],
 };
 
@@ -87,6 +88,7 @@ describe("useCreateLink", () => {
       "https://example.com",
       [],
       "user-1",
+      undefined,
       undefined
     );
   });
@@ -112,7 +114,8 @@ describe("useCreateLink", () => {
       "https://example.com",
       [],
       "user-1",
-      "MYCODE"
+      "MYCODE",
+      undefined
     );
   });
 

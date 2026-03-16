@@ -11,7 +11,7 @@ import type {
 export async function fetchLinks(): Promise<QRLinkRow[]> {
   const { data, error } = await supabase
     .from("qr_links")
-    .select("*, geo_routes(*)")
+    .select("id, user_id, name, short_code, default_url, is_active, created_at, expires_at, geo_routes(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

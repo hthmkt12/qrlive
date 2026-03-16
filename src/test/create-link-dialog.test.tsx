@@ -141,6 +141,7 @@ describe("CreateLinkDialog", () => {
         geoRoutes: [],
         userId: "user-1",
         customShortCode: undefined,
+        expiresAt: null,
       });
     });
   });
@@ -385,6 +386,7 @@ describe("CreateLinkDialog", () => {
         geoRoutes: [],
         userId: "user-1",
         customShortCode: "MY-LINK",
+        expiresAt: null,
       });
     });
   });

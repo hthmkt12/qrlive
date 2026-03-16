@@ -64,7 +64,7 @@ describe("analytics queries", () => {
     await fetchLinks();
 
     expect(supabase.from).toHaveBeenCalledWith("qr_links");
-    expect(select).toHaveBeenCalledWith("*, geo_routes(*)");
+    expect(select).toHaveBeenCalledWith("id, user_id, name, short_code, default_url, is_active, created_at, expires_at, geo_routes(*)");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
   });
 

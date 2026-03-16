@@ -31,13 +31,15 @@ export function useCreateLink() {
       geoRoutes,
       userId,
       customShortCode,
+      expiresAt,
     }: {
       name: string;
       defaultUrl: string;
       geoRoutes: { country: string; countryCode: string; targetUrl: string }[];
       userId: string;
       customShortCode?: string;
-    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode),
+      expiresAt?: string | null;
+    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt),
     onSuccess: () => {
       invalidateLinks();
       invalidateAnalytics();
@@ -55,7 +57,7 @@ export function useUpdateLink() {
       updates,
     }: {
       id: string;
-      updates: { name?: string; default_url?: string; is_active?: boolean };
+      updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null };
     }) => updateLinkInDB(id, updates),
     onSuccess: invalidate,
   });

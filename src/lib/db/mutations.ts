@@ -23,7 +23,8 @@ export async function createLinkInDB(
   defaultUrl: string,
   geoRoutes: { country: string; countryCode: string; targetUrl: string; bypassUrl?: string }[],
   userId: string,
-  customShortCode?: string
+  customShortCode?: string,
+  expiresAt?: string | null
 ): Promise<QRLinkRow> {
   let shortCode: string;
 
@@ -47,7 +48,13 @@ export async function createLinkInDB(
 
   const { data: link, error } = await supabase
     .from("qr_links")
-    .insert({ name, short_code: shortCode, default_url: defaultUrl, user_id: userId })
+    .insert({
+      name,
+      short_code: shortCode,
+      default_url: defaultUrl,
+      user_id: userId,
+      expires_at: expiresAt || null,
+    })
     .select()
     .single();
 
@@ -80,7 +87,7 @@ export async function createLinkInDB(
 
 export async function updateLinkInDB(
   id: string,
-  updates: { name?: string; default_url?: string; is_active?: boolean }
+  updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null }
 ) {
   const { error } = await supabase.from("qr_links").update(updates).eq("id", id);
   if (error) throw error;
