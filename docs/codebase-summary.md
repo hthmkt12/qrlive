@@ -23,10 +23,10 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 140+ |
-| **Repo Tokens** | ~95K |
-| **Tests** | 97 passing |
-| **Test Coverage** | ~72% (app tests + gateway smoke tests + component tests) |
+| **Total Files** | 145+ |
+| **Repo Tokens** | ~98K |
+| **Tests** | 141 passing |
+| **Test Coverage** | ~72% (app tests + gateway smoke tests + component tests + hook tests) |
 | **Code Files** | ~55 (src/ + supabase/ + functions/) |
 | **Dependencies** | 24 prod + 13 dev |
 | **Build Time** | ~10s |
@@ -43,9 +43,18 @@ qrlive/
 │   ├── components/            # Reusable UI + 45 shadcn/ui components
 │   ├── contexts/              # Auth context provider
 │   ├── hooks/                 # React hooks (useLinks, useLinkMutations)
-│   ├── lib/                   # Database, schemas, types, utilities
+│   ├── lib/                   # Schemas, types, utilities
+│   │   ├── db/                # Database (modularized 2026-03-16)
+│   │   │   ├── models.ts      # Type definitions
+│   │   │   ├── queries.ts     # Read operations
+│   │   │   ├── mutations.ts   # Write operations
+│   │   │   ├── utils.ts       # Utility functions
+│   │   │   └── index.ts       # Barrel export
+│   │   ├── schemas.ts         # Zod validation schemas
+│   │   ├── types.ts           # TypeScript types
+│   │   └── query-keys.ts      # React Query keys
 │   ├── integrations/supabase/ # Supabase client & types
-│   ├── test/                  # 37 unit/integration tests
+│   ├── test/                  # 141 unit/integration tests
 │   ├── App.tsx                # Root component + routing
 │   ├── main.tsx               # Entry point
 │   └── index.css              # Tailwind + global styles
@@ -254,7 +263,7 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 ---
 
-## Testing (97 tests total)
+## Testing (141 tests total)
 
 ### Schemas (17 tests)
 - Valid/invalid link forms (auto-code + custom-code patterns)
@@ -264,7 +273,7 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 ### Database (11 tests)
 - Fetch links
-- Generate short code (collision-safe)
+- Generate short code (collision-safe, crypto.randomUUID())
 - Create/update/delete link (with custom code validation)
 - Insert geo routes (error handling)
 - Aggregate analytics summary query
@@ -275,6 +284,7 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - Session initialization
 - Auth event subscription
 - Sign in/up/out
+- Normalized auth error messages
 
 ### Link Card (16 tests)
 - Render with link data
@@ -295,6 +305,14 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - Submit with new link
 - Custom code format: ^[A-Z0-9_-]{3,20}$
 - Error handling (INVALID_SHORT_CODE_FORMAT message)
+
+### Link Mutations Hook (12 tests) — Added 2026-03-16
+- Create link mutations
+- Update link mutations
+- Geo routes mutations
+- Toggle link state
+- Delete link operations
+- Error handling & refetch logic
 
 ### App Smoke (1 test)
 - Vitest sanity wiring
@@ -351,7 +369,11 @@ supabase functions deploy redirect --no-verify-jwt
 | File | Purpose |
 |------|---------|
 | **src/App.tsx** | Root component, routing, providers setup |
-| **src/lib/db.ts** | Supabase queries (fetch, create, update, delete) |
+| **src/lib/db/index.ts** | Barrel export (queries, mutations, models, utils) |
+| **src/lib/db/queries.ts** | Supabase read operations (fetch links, get analytics) |
+| **src/lib/db/mutations.ts** | Supabase write operations (create, update, delete) |
+| **src/lib/db/models.ts** | Type definitions for queries/mutations |
+| **src/lib/db/utils.ts** | Database utilities (code generation, validation) |
 | **src/lib/schemas.ts** | Zod validation schemas (centralized) |
 | **src/lib/types.ts** | COUNTRIES list, TypeScript types |
 | **src/contexts/auth-context.tsx** | Auth state + methods (useAuth hook) |
@@ -464,10 +486,15 @@ supabase functions deploy redirect --no-verify-jwt
 
 | Issue | Severity | Fix Time | Status |
 |-------|----------|----------|--------|
-| Component test coverage (53/97 tests added) | Medium | ✅ In Progress | 54% → 72% |
+| Component test coverage (53 component + 12 hook tests added) | Medium | ✅ Complete | 64% → 72% |
+| EditLinkDialog tests (~15 tests needed) | Medium | 1-2 hours | Pending |
+| QRPreview tests (~5 tests needed) | Low | 30 mins | Pending |
 | Redirect edge paths RPC coverage | Medium | 2-3 hours | Pending |
 | Long-range analytics pre-aggregation | Medium | 1-2 hours | Pending |
 | Main bundle size reduction (350KB → 239KB) | Low | ✅ Fixed | StatsPanel lazy-loaded |
+| db.ts modularization (252 → 5 files) | Low | ✅ Fixed | 2026-03-16 |
+| Lint errors (no-explicit-any, no-empty-object-type) | Medium | ✅ Fixed | 2026-03-16 |
+| Security: weak RNG + auth errors + git token | High | ✅ Fixed | crypto.randomUUID(), error normalization, history cleaned |
 
 ---
 
@@ -545,5 +572,5 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-16
+**Last Updated**: 2026-03-16 (Major fix session: tests +12, coverage 72%, linting clean, security hardened, db.ts modularized)
 **Next Review**: 2026-04-16

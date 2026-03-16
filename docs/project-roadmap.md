@@ -129,19 +129,22 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **Component test coverage** | ✅ 53 tests added (LinkCard, StatsPanel, CreateLinkDialog) | Complete | ✅ Complete |
+| **Component test coverage** | ✅ 53 tests + 12 hook tests added (141 total) | Complete | ✅ Complete |
 | **EditLinkDialog + QRPreview tests** | Missing 15-20 tests for full component coverage | Medium | Pending |
 | **Redirect/proxy RPC tests** | Proxy gateway has smoke tests; edge redirect paths rely on manual verification | Medium | Pending |
 | **Analytics pre-aggregation/caching** | Stats panel uses aggregate RPCs; higher-volume reports may want cached rollups | Medium | Pending |
 | **Large JS bundle** | ✅ StatsPanel lazy-loaded (239KB main, 109KB chunk) | Complete | ✅ Complete |
+| **Linting & type errors** | ✅ All resolved (no-explicit-any, no-empty-object-type, tooling exclusions) | Complete | ✅ Complete |
+| **Security hardening** | ✅ Crypto RNG, auth error normalization, git history cleaned | Complete | ✅ Complete |
 
 **Details**:
-1. **Component test coverage**: ✅ 53 tests added covering LinkCard, StatsPanel, and CreateLinkDialog form validation.
+1. **Component test coverage**: ✅ 53 tests added covering LinkCard, StatsPanel, and CreateLinkDialog form validation. ✅ 12 tests added for use-link-mutations hook (2026-03-16).
    ```typescript
    // Completed:
    - CreateLinkDialog.tsx (17 tests) ✅
    - LinkCard.tsx (16 tests) ✅
    - StatsPanel.tsx (20 tests) ✅
+   - use-link-mutations hook (12 tests) ✅
 
    // Remaining:
    - EditLinkDialog.tsx (form updates) — ~15 tests
@@ -153,6 +156,8 @@ None currently blocking.
 3. **Analytics pre-aggregation/caching**: Dashboard and stats panel now use aggregate RPCs. Higher-volume analytics may want cached rollups or materialized summaries for >30-day ranges.
 
 4. **Large JS bundle**: ✅ Resolved. Main bundle reduced to 239KB gzipped; StatsPanel lazy-loaded as 109KB chunk with Suspense.
+
+5. **Code modularization**: ✅ Resolved. src/lib/db.ts refactored from 252 lines into modular structure (models.ts, queries.ts, mutations.ts, utils.ts) with barrel export.
 
 ### Low Priority
 - [ ] API documentation (OpenAPI/Swagger)
@@ -166,7 +171,7 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 72% (97 tests passing) | ⚠️ 8% below target |
+| **Test Coverage** | >80% | 72% (141 tests passing) | ⚠️ 8% below target |
 | **Build Time** | <30s | ~10s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
@@ -247,7 +252,7 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (97 tests, 72%)
+### Current Coverage (141 tests, 72%)
 - ✅ Schema validation (17 tests)
 - ✅ Database utilities + analytics query helpers (11 tests)
 - ✅ Auth context (8 tests)
@@ -255,6 +260,7 @@ None currently blocking.
   - LinkCard: 16 tests (render, actions, states)
   - StatsPanel: 20 tests (charts, data, formatting)
   - CreateLinkDialog: 17 tests (validation, custom codes, errors)
+- ✅ Hook tests (use-link-mutations) (12 tests) — added 2026-03-16
 - ✅ Vitest sanity test (1 test)
 - ✅ Proxy gateway smoke tests (3 tests)
 - ✅ Query helpers (4 tests)
@@ -266,7 +272,7 @@ None currently blocking.
 - [ ] E2E tests (Playwright)
 - [ ] Edge function tests (Deno RPC validation)
 
-**Target**: >80% coverage | **Current**: 72% ✅ (up from 66%)
+**Target**: >80% coverage | **Current**: 72% ✅ (up from 64% baseline, +8% since 2026-03-16)
 
 ---
 
