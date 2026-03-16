@@ -54,7 +54,7 @@ QR scan → Supabase Edge Function (redirect/{shortCode}) → 302 to target URL
 Deno runtime. Handles all QR code redirect requests:
 1. Validates short code format (`^[A-Z0-9_-]{3,20}$`)
 2. Checks link expiration (`expires_at`)
-3. Serves password form (GET) or verifies password hash (POST) for protected links — SHA-256 with salt
+3. Serves password form (GET) or verifies password (POST) for protected links — PBKDF2-HMAC-SHA256 (new) with legacy SHA-256 backward compat
 4. Determines redirect target: `bypass_url → geo target_url → default_url` (country via `cf-ipcountry` header)
 5. Rate-limits clicks (1 per IP per 60s), filters bots, records click events
 6. Returns 302 with `Cache-Control: no-store`
@@ -63,7 +63,7 @@ Uses service role key (bypasses RLS) for `click_events` INSERT.
 
 ### Database Schema (Supabase Postgres)
 
-- `qr_links` — user's links (short_code, default_url, is_active, expires_at, password_hash, password_salt)
+- `qr_links` — user's links (short_code, default_url, is_active, expires_at, password_hash, password_salt, has_password)
 - `geo_routes` — per-link country routing (country_code, target_url, bypass_url)
 - `click_events` — analytics raw events (link_id, country_code, ip_address, referer, user_agent)
 - RLS on all tables; owner-only access for user data; service role for click_events INSERT
@@ -72,9 +72,9 @@ Uses service role key (bypasses RLS) for `click_events` INSERT.
 
 ### Password Protection
 
-- Client: `src/lib/password-utils.ts` — Web Crypto API SHA-256 hashing for form submission
-- Edge function: hashes submitted password and compares to stored `password_hash`
-- `password_hash` / `password_salt` never returned to frontend by `fetchLinks`
+- Client: `src/lib/password-utils.ts` — PBKDF2-HMAC-SHA256 (600k iterations, Web Crypto API). Self-describing hash format; legacy SHA-256 backward compat.
+- Edge function: verifies submitted password via constant-time comparison; opportunistically rehashes legacy SHA-256 to PBKDF2 on success.
+- `password_hash` / `password_salt` never returned to frontend by `fetchLinks` (server-side `has_password` generated column instead).
 
 ## Role & Responsibilities
 

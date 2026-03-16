@@ -13,9 +13,10 @@ A production-ready QR code link management platform with geo-routing, bypass URL
 ### Core Functionality
 - **Auth System**: Email/password signup, login, logout with session persistence
 - **QR Link Management**: Create, edit, delete, and toggle QR links with auto-generated 6-character codes or custom 3-20 character short codes
+- **Protected & Expiring Links**: Optional password protection plus expiration dates enforced by the redirect edge function
 - **Geo-Routing**: Route visitors to different URLs based on 15 supported countries (US, GB, JP, KR, DE, FR, VN, TH, SG, AU, CA, BR, IN, CN, RU)
 - **Bypass URLs**: Optional override URLs for accessing geo-blocked content (priority: bypass_url → target_url → default_url)
-- **Click Analytics**: Real-time tracking with 7-day charts, country distribution, referer breakdown, and bot filtering
+- **Click Analytics**: Real-time tracking with date range filtering, country distribution, referer breakdown, and bot filtering
 
 ### User Experience
 - **Vietnamese UI**: All text localized for Vietnamese users
@@ -86,25 +87,32 @@ Get credentials from [Supabase Dashboard](https://app.supabase.com/projects).
 
 ```
 src/
-├── pages/               # Route pages (Index, Auth, NotFound)
+├── pages/               # Route pages (Index, Auth, NotFound) — lazy-loaded
 ├── components/          # Reusable UI + business components
 │   ├── LinkCard.tsx
 │   ├── CreateLinkDialog.tsx
 │   ├── EditLinkDialog.tsx
-│   ├── StatsPanel.tsx
+│   ├── StatsPanel.tsx   # Shell (12 KB) — lazy-loads StatsCharts
+│   ├── StatsCharts.tsx  # Recharts visualizations (loaded on demand)
+│   ├── DashboardHeader.tsx
+│   ├── DashboardMetrics.tsx
 │   └── ui/             # 45 shadcn/ui components
 ├── contexts/            # Auth context provider
 ├── hooks/               # useLinks, useLinkMutations, useMobile
 ├── lib/                 # Database ops, schemas, types, utilities
 ├── integrations/        # Supabase client
-├── test/                # 37 unit/integration tests
-└── App.tsx              # Root component + routing
+├── test/                # 289 unit/integration tests across 20 files
+└── App.tsx              # Root component + routing (code-split)
 
 supabase/
-├── functions/redirect/  # Edge function for QR redirects
-└── migrations/          # 6 database migrations
+├── functions/redirect/
+│   ├── redirect-handler.ts  # Runtime-agnostic handler logic (testable)
+│   └── index.ts             # Thin Deno wrapper
+├── functions/proxy/         # Content-fetch proxy (FALLBACK/TESTING ONLY)
+└── migrations/          # 11 database migrations
 
-proxy-gateway/           # Always-on bypass gateway via HTTP/SOCKS5 proxy vendor
+cloudflare-worker/           # Redirect-domain gateway (r.yourdomain.com → Supabase edge)
+proxy-gateway/               # Canonical bypass gateway for bypass_url (Fly.io Tokyo)
 docs/                    # Documentation (see below)
 ```
 
@@ -134,7 +142,7 @@ npm run typecheck       # TypeScript type checking
 npm run lint            # ESLint code quality
 
 # Testing
-npm run test            # Run app test suite (37 Vitest tests)
+npm run test            # Run app test suite (289 Vitest tests across 20 files)
 npm run test:watch     # Watch mode for development
 
 # Building
@@ -156,10 +164,15 @@ npm run gateway:test    # Run proxy-gateway smoke tests
 
 ## Testing
 
-37 app tests covering:
-- **Schemas** (17 tests): Zod validation for links, auth, geo routes
-- **Database** (11 tests): CRUD operations, short code generation, analytics query helpers
+289 app tests across 20 test files covering:
+- **Schemas & Validation** (17 tests): Zod validation for links, auth, geo routes
+- **Database & Data Layer** (57 tests): db utilities, mutations, query helpers, and query keys
 - **Auth Context** (8 tests): Session management, login/logout
+- **Hooks & Utilities** (37 tests): use-links, use-link-mutations, password hashing helpers
+- **Pages** (22 tests): Index, Auth, NotFound page rendering and interactions
+- **UI Components** (92 tests): CreateLinkDialog, EditLinkDialog, LinkCard, StatsPanel, QRPreview, analytics date picker
+- **Redirect Handler** (13 tests): Real edge logic — password, expiration, geo-routing, bot filtering, rate limiting
+- **Redirect Integration** (42 tests): password, expiration, and redirect flow behavior (simulator)
 - **Sanity Check** (1 test): Base Vitest wiring
 
 Run tests:
@@ -200,15 +213,16 @@ npm run test:watch   # Watch mode
 ## Known Issues & Roadmap
 
 ### Current Issues (Medium Priority)
-1. Business components still lack automated tests (`StatsPanel`, `LinkCard`, dialogs, `QRPreview`)
-2. Detailed analytics now use server-side aggregate RPCs, but very high-volume or long-range reporting will eventually want pre-aggregated rollups or caching
-3. The redirect edge function still relies on manual verification; only the proxy gateway now has automated smoke tests
-4. Production build currently emits a large main chunk warning and would benefit from code-splitting
+1. Detailed analytics use server-side aggregate RPCs, but very high-volume or long-range reporting will eventually want pre-aggregated rollups or caching
+2. `cloudflare-worker/` still needs production route/secret setup and has no dedicated automated test coverage yet
+
+### Implemented (Shipped)
+- ✅ Password-protected links (PBKDF2-HMAC-SHA256 with legacy SHA-256 compatibility)
+- ✅ Link expiration dates
+- ✅ Advanced analytics (date range filtering, country/referer breakdown)
+- ✅ Route-level code splitting and lazy-loaded analytics charts
 
 ### Planned Features (Q2 2026)
-- Link expiration dates
-- Password-protected links
-- Advanced analytics (date range filtering, exports)
 - Team collaboration
 - Webhook integrations
 - Mobile apps (iOS/Android)
@@ -248,15 +262,27 @@ See [deployment-guide.md](./docs/deployment-guide.md) for detailed instructions.
 |--------|--------|--------|
 | Redirect Latency | <100ms | ~50ms (Cloudflare edge) |
 | Page Load | <2s | ~1.5s (Vercel CDN) |
-| Build Time | <30s | ~10s |
-| Test Coverage | >80% | 66% (40 tests passing) |
+| Build Time | <30s | ~5s (clean, no warnings) |
+| Tests | — | 289/289 passing (20 files) |
 | Uptime | 99.9% | 100% (current) |
+
+### Build Chunks (code-split)
+
+| Chunk | Size | Gzip |
+|-------|------|------|
+| Main bundle | 490 KB | 147 KB |
+| Index page | 213 KB | 70 KB |
+| StatsCharts (lazy) | 393 KB | 107 KB |
+| StatsPanel shell | 12 KB | 4 KB |
+| Schemas | 86 KB | 24 KB |
 
 ---
 
 ## Security
 
 - ✅ RLS (Row-Level Security) on all database tables
+- ✅ Password hashing: PBKDF2-HMAC-SHA256 (600k iterations) with legacy SHA-256 compatibility
+- ✅ Dashboard never exposes password hashes (uses `has_password` boolean)
 - ✅ URL protocol validation (blocks javascript:, data: injection)
 - ✅ Rate limiting (1 click per IP per 60s)
 - ✅ Bot filtering (skips analytics for crawlers)
@@ -295,11 +321,3 @@ Project by hthmkt12. See LICENSE file for details.
 **Last Updated**: 2026-03-16
 **Status**: Production-Ready MVP
 **Maintainer**: hthmkt12
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)

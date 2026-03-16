@@ -25,13 +25,12 @@
 |--------|-------|
 | **Total Files** | 150+ |
 | **Repo Tokens** | ~102K |
-| **Tests** | 159 passing |
-| **Test Coverage** | ~74% (app tests + gateway smoke tests + component tests + hook tests) |
+| **Tests** | 289 passing (20 files) |
 | **Code Files** | ~60 (src/ + supabase/ + functions/) |
-| **Dependencies** | 24 prod + 13 dev |
-| **Build Time** | ~10s |
-| **Bundle Size** | 239KB gzipped (main), StatsPanel lazy-loaded |
-| **Last Updated** | 2026-03-16 (Link expiration, password protection, analytics filtering) |
+| **Dependencies** | 46 prod + 25 dev |
+| **Build Time** | ~5s (clean, no warnings) |
+| **Bundle Size** | 147KB gzipped (main), StatsPanel/StatsCharts lazy-loaded |
+| **Last Updated** | 2026-03-16 (redirect handler extraction, direct handler tests) |
 
 ---
 
@@ -51,20 +50,25 @@ qrlive/
 │   │   │   ├── mutations.ts   # Write operations
 │   │   │   ├── utils.ts       # Utility functions
 │   │   │   └── index.ts       # Barrel export
-│   │   ├── password-utils.ts  # SHA-256 hashing & validation [NEW 2026-03-16]
+│   │   ├── password-utils.ts  # PBKDF2-HMAC-SHA256 hashing & validation (legacy SHA-256 compat) [UPDATED 2026-03-16]
 │   │   ├── schemas.ts         # Zod validation schemas
 │   │   ├── types.ts           # TypeScript types
 │   │   └── query-keys.ts      # React Query keys
 │   ├── integrations/supabase/ # Supabase client & types
-│   ├── test/                  # 141 unit/integration tests
-│   ├── App.tsx                # Root component + routing
+│   ├── test/                  # 289 unit/integration tests (20 files)
+│   ├── App.tsx                # Root component + routing (code-split)
 │   ├── main.tsx               # Entry point
 │   └── index.css              # Tailwind + global styles
 │
 ├── supabase/
-│   ├── functions/redirect/    # Edge function for redirects
-│   └── migrations/            # 6 database migrations
+│   ├── functions/redirect/
+│   │   ├── redirect-handler.ts  # Runtime-agnostic handler logic [NEW 2026-03-16]
+│   │   └── index.ts             # Thin Deno wrapper
+│   ├── functions/proxy/         # Content-fetch proxy (FALLBACK/TESTING ONLY)
+│   └── migrations/            # 11 database migrations
 │
+├── cloudflare-worker/           # ✅ Canonical redirect-domain gateway (r.yourdomain.com → Supabase edge)
+├── proxy-gateway/               # ✅ Canonical bypass gateway for bypass_url (Fly.io Tokyo)
 ├── public/                    # Static assets (favicon, robots.txt)
 ├── .claude/                   # Development context files
 ├── plans/                     # Development phase docs
@@ -153,7 +157,7 @@ short_code TEXT UNIQUE  -- auto-generated: ^[A-Z0-9]{6}$ OR custom: ^[A-Z0-9_-]{
 default_url TEXT
 is_active BOOLEAN
 expires_at TIMESTAMP (nullable)  -- [NEW 2026-03-16] link expiration date
-password_hash TEXT (nullable)    -- [NEW 2026-03-16] SHA-256 hashed password
+password_hash TEXT (nullable)    -- [UPDATED 2026-03-16] PBKDF2 self-describing format (legacy SHA-256 compat)
 created_at TIMESTAMP
 updated_at TIMESTAMP
 
@@ -230,15 +234,15 @@ Create/update/delete mutations trigger targeted invalidation for `QUERY_KEYS.lin
 
 ## Edge Function: redirect/{shortCode}
 
-**Path**: supabase/functions/redirect/index.ts
-**Runtime**: Deno
+**Path**: supabase/functions/redirect/redirect-handler.ts (logic) + index.ts (Deno wrapper)
+**Runtime**: Deno (index.ts wraps the runtime-agnostic handler)
 **Access**: Service role (bypasses RLS)
 
 **Flow**:
 1. Validate short code (`^[A-Z0-9_-]{3,20}$`)
 2. Fetch link + geo_routes (service role)
-3. **[NEW 2026-03-16]** Check expiration: if `expires_at` is in past, return 403
-4. **[NEW 2026-03-16]** If password_hash exists, prompt user for password before redirect
+3. Check expiration: if `expires_at` is in past, return 410 Gone
+4. If password_hash exists, prompt user for password before redirect
 5. Extract geo data: country (cf-ipcountry), IP, user-agent, referer
 6. Check bot pattern (skip recording for crawlers)
 7. Rate limit check (1 click/IP/60s)
@@ -248,12 +252,13 @@ Create/update/delete mutations trigger targeted invalidation for `QUERY_KEYS.lin
 11. Return 302 + no-store cache headers
 
 **Key Details**:
+- Handler logic extracted into `redirect-handler.ts` with `SupabaseAdapter` interface for testability
 - Geo detection: Cloudflare header only (local dev: manual header)
 - Bot pattern: `/bot|crawler|spider|prerender|headless|facebookexternalhit|twitterbot|slurp/i`
 - Rate limiting: Query last 60s, skip if count > 0
 - CORS: Enabled for all origins
-- Expiration: Return 403 Forbidden if link expired
-- Password: SHA-256 hash comparison (lib/password-utils.ts) [NEW 2026-03-16]
+- Expiration: Return 410 Gone if link expired
+- Password: PBKDF2-HMAC-SHA256 verification with constant-time comparison; legacy SHA-256 compat; opportunistic rehash
 
 ---
 
@@ -272,87 +277,38 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 ---
 
-## Testing (159 tests total)
+## Testing (289 tests total)
 
-### Schemas (17 tests)
-- Valid/invalid link forms (auto-code + custom-code patterns)
-- Valid/invalid auth credentials
-- URL validation (protocol, format)
-- Geo route validation
+### High-Level Breakdown
+- **Schemas & Validation** (17 tests) — auth, links, geo-routes, URL validation
+- **Database & Data Layer** (57 tests) — db utils, mutations, query helpers, query keys
+- **Auth Context** (8 tests) — session lifecycle, sign in/up/out, normalized errors
+- **Hooks & Utilities** (37 tests) — use-links, use-link-mutations, password utilities
+- **Pages** (22 tests) — Auth, Index, NotFound rendering and interactions
+- **UI Components** (92 tests) — LinkCard, StatsPanel, Create/Edit dialogs, QRPreview, analytics date picker
+- **Redirect Integration (simulator)** (42 tests) — password, expiration, geo-routing, redirect flow behavior
+- **Redirect Handler (real logic)** (13 tests) — direct tests against `redirect-handler.ts`
+- **App Smoke** (1 test) — Vitest wiring
 
-### Database (11 tests)
-- Fetch links
-- Generate short code (collision-safe, crypto.randomUUID())
-- Create/update/delete link (with custom code validation)
-- Insert geo routes (error handling)
-- Aggregate analytics summary query
-- Detailed analytics RPC normalization
+### Direct Redirect Handler Coverage
+- OPTIONS preflight → 200 + CORS
+- Invalid short code → 400
+- Missing/inactive link → 404
+- Expired link → 410
+- Password-protected GET → 200 form
+- Wrong password → 401
+- Correct password → 302
+- Legacy SHA-256 opportunistic rehash
+- Geo-routing priority (bypass → target → default)
+- Bot traffic skips click insert
+- Non-bot records click
+- Duplicate click within 60s skipped
+- Non-http URL → 400
 
-### Auth Context (8 tests)
-- Initial loading state
-- Session initialization
-- Auth event subscription
-- Sign in/up/out
-- Normalized auth error messages
-
-### Link Card (16 tests)
-- Render with link data
-- Actions (delete, edit, copy)
-- Loading/error states
-- Date formatting
-
-### Stats Panel (20 tests)
-- 7-day chart rendering (T12:00:00Z normalization)
-- Country pie chart
-- Referer list
-- Analytics loading/error states
-- No-data states
-
-### Create Link Dialog (17 tests)
-- Form validation (auto vs custom short code)
-- Geo routes validation
-- Submit with new link
-- Custom code format: ^[A-Z0-9_-]{3,20}$
-- Error handling (INVALID_SHORT_CODE_FORMAT message)
-
-### Link Mutations Hook (12 tests)
-- Create link mutations
-- Update link mutations
-- Geo routes mutations
-- Toggle link state
-- Delete link operations
-- Error handling & refetch logic
-
-### Edit Link Dialog (13 tests) — Added 2026-03-16
-- Form pre-population (expiration, password fields)
-- Expiration date updates
-- Password change validation
-- Custom short code editing
-- Geo route updates
-- Error handling
-
-### QR Preview (5 tests) — Added 2026-03-16
-- QR code generation
-- Short URL display
-- Copy-to-clipboard
-- Error states
-
-### Password Utilities (4 tests) — Added 2026-03-16
-- SHA-256 hash generation
-- Password validation
-- Edge function password checking
-
-### App Smoke (1 test)
-- Vitest sanity wiring
-
-### Proxy Gateway (3 tests)
+### Proxy Gateway Smoke Tests (3 tests)
 - Health endpoint
 - Header forwarding + redirect rewriting
 - Config validation + proxy agent selection
-
-### Query Helpers (4 tests)
-- Analytics summary aggregation
-- Day label formatting
 
 **Run Tests**:
 ```bash
@@ -402,7 +358,7 @@ supabase functions deploy redirect --no-verify-jwt
 | **src/lib/db/mutations.ts** | Supabase write operations (create, update, delete) |
 | **src/lib/db/models.ts** | Type definitions for queries/mutations |
 | **src/lib/db/utils.ts** | Database utilities (code generation, validation) |
-| **src/lib/password-utils.ts** | SHA-256 hashing & validation [NEW 2026-03-16] |
+| **src/lib/password-utils.ts** | PBKDF2-HMAC-SHA256 hashing, constant-time verify, legacy SHA-256 compat [UPDATED 2026-03-16] |
 | **src/lib/schemas.ts** | Zod validation schemas (centralized) |
 | **src/lib/types.ts** | COUNTRIES list, TypeScript types |
 | **src/contexts/auth-context.tsx** | Auth state + methods (useAuth hook) |
@@ -414,7 +370,8 @@ supabase functions deploy redirect --no-verify-jwt
 | **src/components/EditLinkDialog.tsx** | Edit form modal (expiration, password) |
 | **src/components/analytics-date-range-picker.tsx** | Date range selector [NEW 2026-03-16] |
 | **src/components/StatsPanel.tsx** | Analytics visualization |
-| **supabase/functions/redirect/index.ts** | Redirect edge function (with expiration/password checks) |
+| **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (SupabaseAdapter interface) [NEW 2026-03-16] |
+| **supabase/functions/redirect/index.ts** | Thin Deno wrapper for redirect handler |
 
 ---
 
@@ -489,8 +446,10 @@ supabase functions deploy redirect --no-verify-jwt
 - **Redirect latency**: ~50ms (Cloudflare edge)
 - **Page load**: ~1.5s (Vercel CDN + React)
 - **Database queries**: ~50-100ms (Supabase)
-- **Main bundle**: 239KB gzipped (optimized)
-- **StatsPanel chunk**: 109KB gzipped (lazy-loaded with Suspense)
+- **Main bundle**: 147KB gzipped (code-split, optimized)
+- **Index page chunk**: 70KB gzipped
+- **StatsCharts chunk**: 107KB gzipped (lazy-loaded with Suspense)
+- **StatsPanel shell**: 4KB gzipped
 - **React Query caching**: Immediate refetch on mutation
 - **Analytics**: `analyticsByLinkId` wrapped in `useMemo` for perf
 
@@ -516,13 +475,10 @@ supabase functions deploy redirect --no-verify-jwt
 
 | Issue | Severity | Fix Time | Status |
 |-------|----------|----------|--------|
-| Component test coverage (53 + 12 + 18 = 83 tests) | Medium | ✅ Complete | 54% → ~74% |
-| EditLinkDialog tests (13 tests) | Medium | ✅ Complete | 2026-03-16 |
-| QRPreview tests (5 tests) | Low | ✅ Complete | 2026-03-16 |
-| Password utility tests (4 tests) | Low | ✅ Complete | 2026-03-16 |
-| Redirect edge paths RPC coverage (password, expiration) | Medium | 2-3 hours | Pending |
+| App/component/hook test expansion | Medium | ✅ Complete | 289 tests across 20 files |
+| Redirect handler direct tests (13 tests) | Medium | ✅ Complete | 2026-03-16 |
 | Long-range analytics pre-aggregation | Medium | 1-2 hours | Pending |
-| Main bundle size reduction (350KB → 239KB) | Low | ✅ Fixed | StatsPanel lazy-loaded |
+| Main bundle size reduction (790KB → 490KB) | Low | ✅ Fixed | Code-split, lazy-loaded |
 | db.ts modularization (252 → 5 files) | Low | ✅ Fixed | 2026-03-16 |
 | Lint errors (no-explicit-any, no-empty-object-type) | Medium | ✅ Fixed | 2026-03-16 |
 | Security: weak RNG + auth errors + git token | High | ✅ Fixed | crypto.randomUUID(), error normalization, history cleaned |
@@ -604,6 +560,6 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-16 (Link expiration, password protection, analytics filtering: tests +18, coverage ~74%, all Q2 features completed, Vercel auto-deployed)
+**Last Updated**: 2026-03-16 (redirect handler extraction, 289 tests, code-split build)
 **Next Review**: 2026-04-16
-**Version**: v1.2 | **Tests**: 159/159 passing | **Status**: Production-ready with Q2 features
+**Version**: v1.3 | **Tests**: 289/289 passing | **Status**: Production-ready

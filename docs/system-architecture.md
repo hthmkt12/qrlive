@@ -365,19 +365,24 @@ if (!BOT_PATTERN.test(userAgent)) {
 
 ---
 
-### Optional Proxy Gateway (Bypass URL Delivery)
+### Proxy Infrastructure
+
+Three paths handle cross-border access for QR scans and destination content:
+
+| Path | Role | Canonical? |
+|---|---|---|
+| `cloudflare-worker/redirect-proxy.js` | **Redirect-domain gateway** — routes `r.yourdomain.com/CODE` → Supabase redirect edge function, preserving `cf-ipcountry` and all request headers. | ✅ Yes — production redirect layer |
+| `proxy-gateway/` | **Destination-content bypass** — always-on Node.js service (Fly.io Tokyo) that forwards `bypass_url` traffic to `UPSTREAM_ORIGIN` via optional HTTP/SOCKS5 vendor proxy, rewrites `Location` headers. | ✅ Yes — production bypass layer |
+| `supabase/functions/proxy/index.ts` | **Content-fetch proxy** — same bypass intent but runs on Supabase Edge; `supabase.co` may itself be blocked by GFW. | ❌ Fallback/testing only |
 
 ```
-CN user
-  â†’ Cloudflare Worker / redirect domain
-    â†’ Supabase redirect function
-      â†’ bypass_url = https://jp.yourdomain.com/page
-        â†’ proxy-gateway (always-on Node service)
-          â†’ outbound HTTP/SOCKS5 proxy vendor
-            â†’ origin site
+QR scan flow (CN):
+  Phone → r.yourdomain.com/CODE          (cloudflare-worker)
+    → supabase.co/functions/v1/redirect   (redirect edge function)
+      → geo_route for CN → bypass_url     (geo-routing)
+        → jp.yourdomain.com/page          (proxy-gateway on Fly.io)
+          → origin server                 (via vendor proxy)
 ```
-
-The gateway keeps `bypass_url` as a normal HTTPS URL for browsers while moving the actual proxy logic to server-side code.
 
 ## Performance & Optimization
 

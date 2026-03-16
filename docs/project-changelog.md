@@ -10,10 +10,49 @@ All significant changes, features, and fixes documented here.
 
 ### Planned Features
 - E2E tests (Playwright)
-- Edge function integration tests (Deno)
 - Country-specific analytics filtering (pie chart → detail page)
 - QR code customization (colors, logo, border)
 - Bulk import/export functionality
+
+---
+
+## [2026-03-16-v3] — Redirect Handler Extraction & Direct Tests (289 tests)
+
+### Added
+- **Redirect Handler Extraction**
+  - Extracted real edge logic from `supabase/functions/redirect/index.ts` into runtime-agnostic `redirect-handler.ts`
+  - Introduced `SupabaseAdapter` interface for testability (fetchLink, recentClickCount, insertClick, updateLink)
+  - `index.ts` is now a thin Deno wrapper delegating to the extracted handler
+
+- **Direct Redirect Handler Tests** (13 tests in `redirect-handler.test.ts`)
+  - OPTIONS preflight → 200 + CORS
+  - Invalid short code → 400
+  - Missing/inactive link → 404
+  - Expired link → 410 HTML
+  - Password-protected GET → 200 form, wrong POST → 401, correct POST → 302
+  - Legacy SHA-256 opportunistic rehash path
+  - Geo-routing priority (bypass → target → default)
+  - Bot traffic skips click insert, non-bot records click
+  - Duplicate click within 60s skipped
+  - Non-http URL → 400
+
+- **Route-Level Code Splitting**
+  - Pages (Index, Auth, NotFound) lazy-loaded via `React.lazy()`
+  - StatsCharts extracted and lazy-loaded from StatsPanel shell
+  - DashboardHeader, DashboardMetrics extracted
+  - Main chunk: 790KB → 490KB (−38%)
+
+- **React Router v7 Future Flags**
+  - Enabled `v7_startTransition` and `v7_relativeSplatPath` on all routers
+
+- **Browserslist Data Refresh**
+  - `npm update caniuse-lite` resolved outdated-data warning
+
+### Status Summary
+- **Tests**: 289/289 passing ✅
+- **Test Files**: 20
+- **Build**: Clean, no warnings (~5s)
+- **Typecheck**: 0 errors
 
 ---
 
@@ -55,11 +94,11 @@ All significant changes, features, and fixes documented here.
 - **Link Expiration Feature**
   - `expires_at` field in qr_links table (migration: 20260316100000)
   - Form UI for expiration date selection
-  - Redirect enforcement (403 if link expired)
+  - Redirect enforcement (410 if link expired)
   - Migration verified & deployed
 
 - **Password-Protected Links**
-  - SHA-256 Web Crypto hashing (`src/lib/password-utils.ts`)
+  - PBKDF2-HMAC-SHA256 Web Crypto hashing with constant-time verification (`src/lib/password-utils.ts`); legacy SHA-256 backward compat
   - Password prompt on redirect (requires correct password before accessing target)
   - Form validation on create/edit link dialog
   - Migration verified & deployed
@@ -187,6 +226,7 @@ All significant changes, features, and fixes documented here.
 | v1.1 | 2026-03-15 | Released | 97 | 66% |
 | v1.2 | 2026-03-16 | Released | 159 | ~74% |
 | v1.2-coverage-push | 2026-03-16 | Released | 269 | 93.34% ✅ |
+| v1.3 | 2026-03-16 | Released | 289 | — (handler extraction + code split) |
 
 ---
 
@@ -211,21 +251,22 @@ None documented. All releases maintain backward compatibility.
 ## Known Limitations
 
 ### Test Coverage
-- ✅ EditLinkDialog: Tests complete (13 tests) — 2026-03-16
-- ✅ QRPreview: Tests complete (5 tests) — 2026-03-16
-- ✅ Database mutations: Tests complete (40+ tests) — 2026-03-16
-- ✅ Page components: Tests complete (30+ tests) — 2026-03-16
+- ✅ EditLinkDialog: Tests complete (13 tests)
+- ✅ QRPreview: Tests complete (5 tests)
+- ✅ Database mutations: Tests complete (40+ tests)
+- ✅ Page components: Tests complete (30+ tests)
+- ✅ Redirect handler: Direct tests complete (13 tests) — exercises real edge logic
 - Integration tests: Not yet written (planned)
 - E2E tests: Playwright fixtures exist but not in CI
 
 ### Analytics
-- Date range filtering not yet implemented
+- ✅ Date range filtering implemented
 - Country-specific filters UI pending
 - No cached rollups for >30-day ranges
 
 ### Features
-- No link expiration dates
-- No password protection
+- ✅ Link expiration dates implemented
+- ✅ Password-protected links implemented
 - No QR code customization
 - No bulk import/export
 
@@ -263,4 +304,3 @@ None yet.
 **Repository**: https://github.com/hthmkt12/qrlive
 **Live URL**: https://qrlive.vercel.app
 **Last Updated**: 2026-03-16
-

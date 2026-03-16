@@ -1,11 +1,15 @@
 /**
  * Supabase Edge Function: Content Proxy
  *
- * Zero-infrastructure alternative to Japan VPS. Fetches a target URL server-side
- * and streams the response back to the client.
+ * STATUS: FALLBACK / TESTING ONLY — DO NOT USE IN PRODUCTION.
  *
- * IMPORTANT CAVEAT: supabase.co may itself be blocked by GFW in China.
- * Use Japan VPS (proxy-gateway/ → Fly.io Tokyo) for production. This is fallback/testing only.
+ * Zero-infrastructure alternative to the canonical proxy-gateway/ service.
+ * Fetches a target URL server-side and streams the response back to the client.
+ *
+ * IMPORTANT: supabase.co may itself be blocked by GFW in China.
+ * → For production bypass_url traffic, use proxy-gateway/ (Fly.io Tokyo).
+ * → For production redirect-domain access, use cloudflare-worker/.
+ * This function exists only for local testing or emergency fallback.
  *
  * Required env vars (set via Supabase dashboard or CLI):
  *   PROXY_SECRET          — secret key; clients must supply in Authorization header
