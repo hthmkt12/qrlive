@@ -249,8 +249,17 @@ vercel --prod
 
 ### Backend (Supabase)
 ```bash
+# Apply new migrations when the release includes schema changes
+supabase db push
+
+# Public redirect endpoint
 supabase functions deploy redirect --no-verify-jwt
+
+# Deploy when cache invalidation logic changes ship
+supabase functions deploy link-cache-invalidate
 ```
+
+If browser Sentry monitoring is enabled for the release, set `VITE_SENTRY_DSN` in Vercel and trigger a new production deploy so the bundled frontend picks it up.
 
 ### Optional Bypass Gateway
 ```bash

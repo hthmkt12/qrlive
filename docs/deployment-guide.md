@@ -171,11 +171,15 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
      **Value**: `https://ybxmpuirarncxmenprzf.supabase.co`
    - **Name**: `VITE_SUPABASE_PUBLISHABLE_KEY`
      **Value**: `eyJ...` (copy from Supabase dashboard)
+   - **Name**: `VITE_SENTRY_DSN`
+     **Value**: `https://...@o....ingest.sentry.io/...` (optional, enables browser Sentry in production)
 
 **Environments to set for**:
 - Production
 - Preview
 - Development
+
+After changing any `VITE_*` variable, trigger a new Vercel deploy so the frontend bundle is rebuilt with the new values.
 
 ### For GitHub Actions PR CI
 Add these repository secrets in GitHub → Settings → Secrets and variables → Actions:
@@ -301,6 +305,21 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY "your-service-role-key"
 ```bash
 supabase secrets list
 ```
+
+### Optional Redis Cache Secrets
+
+Set these only when the hot-link cache is enabled in production:
+
+```bash
+supabase secrets set UPSTASH_REDIS_REST_URL "https://..."
+supabase secrets set UPSTASH_REDIS_REST_TOKEN "your-upstash-token"
+```
+
+### Webhook Signing Secret Note
+
+Do not set a global `WEBHOOK_SIGNING_SECRET` for this repo.
+
+`click.created` webhook signatures are generated from each link's stored `webhook_secret`, so the signing secret is managed per link in the database rather than as a shared edge-function secret.
 
 ### Verify Edge Function Access
 
@@ -472,18 +491,22 @@ curl -i "https://ybxmpuirarncxmenprzf.supabase.co/functions/v1/redirect/{SHORT_C
 - [ ] Repository created on GitHub (hthmkt12/qrlive)
 - [ ] Supabase project created (ybxmpuirarncxmenprzf)
 - [ ] Local `.env.local` configured with Supabase credentials
-- [ ] Migrations applied (supabase db push)
+- [ ] Migrations applied when the release includes new SQL files (`supabase db push`)
 - [ ] RLS policies verified
-- [ ] Edge function deployed (supabase functions deploy redirect --no-verify-jwt)
-- [ ] Edge function secrets set (SUPABASE_SERVICE_ROLE_KEY)
+- [ ] Redirect edge function deployed (`supabase functions deploy redirect --no-verify-jwt`)
+- [ ] Cache invalidation edge function deployed when cache changes ship (`supabase functions deploy link-cache-invalidate`)
+- [ ] Required Supabase edge secret set (`SUPABASE_SERVICE_ROLE_KEY`)
+- [ ] Optional Redis edge secrets set when cache is enabled (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`)
 - [ ] Vercel project created and linked to GitHub
-- [ ] Vercel environment variables set (VITE_SUPABASE_*)
+- [ ] Vercel environment variables set (`VITE_SUPABASE_*`; optional `VITE_SENTRY_DSN`)
+- [ ] New Vercel deploy triggered after changing any `VITE_*` variable
 - [ ] Production domain configured (qrlive.vercel.app)
 - [ ] Auth redirect URLs configured in Supabase
 - [ ] Database indexes created
 - [ ] Test signup/login flow
 - [ ] Test QR code redirect
 - [ ] Test analytics dashboard
+- [ ] Run deployed smoke test (`npm run test:e2e:deployed`)
 
 ---
 
