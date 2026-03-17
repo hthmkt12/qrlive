@@ -487,6 +487,27 @@ curl -i "https://ybxmpuirarncxmenprzf.supabase.co/functions/v1/redirect/{SHORT_C
 
 ---
 
+## Deployed E2E Smoke Verification
+
+After deploying, run the integration smoke test against production:
+
+```bash
+npm run test:e2e:deployed
+```
+
+This targets `https://qrlive.vercel.app` without starting the local dev server. The test:
+- Logs in with preset credentials (`E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` in `.env.local`)
+- Creates a link, triggers a real redirect, asserts analytics data
+- Cleans up the created link automatically
+
+To target a different environment, set `E2E_BASE_URL`:
+```powershell
+$env:E2E_BASE_URL = "https://staging.example.com"
+npx playwright test e2e/integration-create-redirect-analytics.spec.ts --reporter=line
+```
+
+---
+
 ## Post-Deployment
 
 ### Monitor Performance

@@ -221,7 +221,7 @@ None currently blocking.
 
 ### Low Priority
 - [x] API documentation (OpenAPI/Swagger) — `docs/openapi.yaml`
-- [ ] Full deployed edge-function E2E verification with seeded test account
+- [x] Full deployed E2E verification (`npm run test:e2e:deployed` → qrlive.vercel.app)
 
 ---
 
@@ -325,8 +325,9 @@ None currently blocking.
 - ✅ Playwright E2E suite: 30 passed, 0 skipped (Chromium, auth-gated dashboard flows + redirect smoke)
 
 ### Remaining (before 1.0 release)
-- [ ] Integration tests (create link → redirect → analytics)
-- [ ] Full end-to-end deployed edge function + webhook monitor
+- [x] Integration tests (create → redirect → analytics) ✅ (2026-03-17)
+- [x] Deployed E2E verification (`npm run test:e2e:deployed`) ✅ (2026-03-17)
+- [ ] Edge function + webhook delivery monitor (automated alerting)
 
 **Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 336 tests across 29 files
 
@@ -362,7 +363,7 @@ None currently blocking.
 
 ### Planned Security
 - [ ] CSRF protection (SameSite cookies)
-- [ ] Content Security Policy (CSP) headers
+- [x] Content Security Policy (CSP) headers
 - [ ] Subresource Integrity (SRI) for CDN files
 - [ ] API key authentication (for webhooks)
 - [ ] Audit logging (who accessed what)
@@ -382,7 +383,7 @@ None currently blocking.
 - openapi.yaml
 
 ### To Add
-- [ ] User guide (how to use the app)
+- [x] User guide (docs/user-guide.md — Vietnamese)
 - [ ] FAQ section
 - [ ] Troubleshooting guide
 - [ ] Architecture decision records (ADRs)
@@ -452,6 +453,7 @@ None identified.
 - [x] Webhook integrations ✅ (2026-03-17: per-link click.created POST notifications)
 - [x] Redis link metadata cache ✅ (2026-03-17: Upstash SETEX + invalidation edge function)
 - [x] API documentation ✅ (2026-03-17: OpenAPI 3.1 spec for redirect, proxy, and webhook)
+- [x] Hardened CSP headers ✅ (2026-03-17: removed unsafe-inline from script-src, added base-uri/object-src/form-action/worker-src)
 
 ### V2.0 (Platform)
 - [ ] Team collaboration

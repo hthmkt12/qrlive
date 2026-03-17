@@ -27,6 +27,10 @@ A production-ready QR code link management platform with geo-routing, bypass URL
 - **Loading States**: Skeleton screens instead of spinners
 - **Toast Notifications**: Immediate feedback on actions
 
+### Security
+- **Hardened CSP**: No `unsafe-inline` scripts; restricted `connect-src`, `object-src 'none'`, `form-action 'self'`
+- **Security Headers**: HSTS (preload), X-Frame-Options DENY, X-Content-Type-Options nosniff, strict Referrer-Policy, Permissions-Policy
+
 ---
 
 ## Tech Stack
@@ -133,6 +137,7 @@ All documentation is in the `docs/` directory:
 | **[deployment-guide.md](./docs/deployment-guide.md)** | Step-by-step setup: local, Supabase, Vercel, edge functions |
 | **[project-roadmap.md](./docs/project-roadmap.md)** | Status, completed features, known issues, future plans |
 | **[codebase-summary.md](./docs/codebase-summary.md)** | Quick reference for developers and LLMs |
+| **[user-guide.md](./docs/user-guide.md)** | Hướng dẫn sử dụng cho người dùng (Vietnamese) |
 | **[openapi.yaml](./docs/openapi.yaml)** | Machine-readable contract for redirect endpoints, proxy surfaces, and click webhooks |
 
 ---
