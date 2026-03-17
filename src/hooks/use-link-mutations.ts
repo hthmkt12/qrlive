@@ -6,7 +6,9 @@ import {
   deleteLinkInDB,
   QRLinkRow,
 } from "@/lib/db";
+import type { QrConfig } from "@/lib/db/models";
 import { QUERY_KEYS } from "@/lib/query-keys";
+import type { GroupedLink } from "@/lib/bulk-operations-schemas";
 
 /** Invalidates the links query to trigger a background refetch */
 function useInvalidateLinks() {
@@ -33,6 +35,7 @@ export function useCreateLink() {
       customShortCode,
       expiresAt,
       password,
+      qrConfig,
     }: {
       name: string;
       defaultUrl: string;
@@ -41,7 +44,8 @@ export function useCreateLink() {
       customShortCode?: string;
       expiresAt?: string | null;
       password?: string;
-    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt, password),
+      qrConfig?: QrConfig | null;
+    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt, password, qrConfig),
     onSuccess: () => {
       invalidateLinks();
       invalidateAnalytics();
@@ -60,7 +64,7 @@ export function useUpdateLink() {
       password,
     }: {
       id: string;
-      updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null };
+      updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null; qr_config?: QrConfig | null };
       password?: string; // undefined = no change; "" = clear; non-empty = set new
     }) => updateLinkInDB(id, updates, password),
     onSuccess: invalidate,
@@ -116,6 +120,65 @@ export function useDeleteLink() {
   const invalidateAnalytics = useInvalidateDashboardAnalytics();
   return useMutation({
     mutationFn: (id: string) => deleteLinkInDB(id),
+    onSuccess: () => {
+      invalidateLinks();
+      invalidateAnalytics();
+    },
+  });
+}
+
+// ── Bulk Create ───────────────────────────────────────────────────────────────
+
+export interface BulkCreateResult {
+  succeeded: number;
+  failed: number;
+  errors: Array<{ name: string; error: string }>;
+}
+
+/**
+ * Bulk create links sequentially from grouped CSV rows.
+ * Calls onProgress(completed, total) after each attempt for progress tracking.
+ */
+export function useBulkCreateLinks() {
+  const invalidateLinks = useInvalidateLinks();
+  const invalidateAnalytics = useInvalidateDashboardAnalytics();
+
+  return useMutation({
+    mutationFn: async ({
+      links,
+      userId,
+      onProgress,
+    }: {
+      links: GroupedLink[];
+      userId: string;
+      onProgress?: (completed: number, total: number) => void;
+    }): Promise<BulkCreateResult> => {
+      const result: BulkCreateResult = { succeeded: 0, failed: 0, errors: [] };
+
+      for (let i = 0; i < links.length; i++) {
+        const link = links[i];
+        try {
+          await createLinkInDB(
+            link.name,
+            link.default_url,
+            link.geo_routes,
+            userId,
+            link.custom_short_code || undefined,
+            link.expires_at || null
+          );
+          result.succeeded++;
+        } catch (err) {
+          result.failed++;
+          result.errors.push({
+            name: link.name,
+            error: err instanceof Error ? err.message : "Lỗi không xác định",
+          });
+        }
+        onProgress?.(i + 1, links.length);
+      }
+
+      return result;
+    },
     onSuccess: () => {
       invalidateLinks();
       invalidateAnalytics();

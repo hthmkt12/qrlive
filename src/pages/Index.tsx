@@ -6,6 +6,8 @@ import { CreateLinkDialog } from "@/components/CreateLinkDialog";
 import { LinkCard } from "@/components/LinkCard";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { DashboardMetrics } from "@/components/DashboardMetrics";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
+import { BulkExportButton } from "@/components/bulk-export-button";
 // Lazy-load StatsPanel (pulls in Recharts ~80KB) — only loaded when user opens analytics view
 const StatsPanel = lazy(() => import("@/components/StatsPanel").then((m) => ({ default: m.StatsPanel })));
 import { EditLinkDialog } from "@/components/EditLinkDialog";
@@ -83,6 +85,14 @@ const Index = () => {
             </span>
           </div>
         </motion.div>
+
+        {/* Bulk import/export toolbar — shown only when there are links or while loading */}
+        {!isLoading && (
+          <div className="flex items-center justify-end gap-2 mb-4">
+            <BulkImportDialog />
+            <BulkExportButton links={links} />
+          </div>
+        )}
 
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
