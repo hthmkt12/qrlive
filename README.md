@@ -146,7 +146,8 @@ npm run typecheck       # TypeScript type checking
 npm run lint            # ESLint code quality
 
 # Testing
-npm run test            # Run full test suite (308 Vitest tests across 25 files)
+npm run test            # Run full test suite (334 Vitest tests across 29 files)
+npm run test:coverage   # Run Vitest with coverage for app, redirect logic, cache helpers, and Worker
 npm run test:watch     # Watch mode for development
 
 # Building
@@ -168,7 +169,7 @@ npm run gateway:test    # Run proxy-gateway smoke tests
 
 ## Testing
 
-308 unit/integration tests across 25 test files covering:
+334 unit/integration tests across 29 test files covering:
 - **Schemas & Validation**: Zod validation for links, auth, geo routes, and optional webhook URLs
 - **Database & Data Layer**: db utilities, mutations, query helpers, and query keys
 - **Auth Context & Hooks**: session lifecycle, query wiring, and password hashing helpers
@@ -178,7 +179,7 @@ npm run gateway:test    # Run proxy-gateway smoke tests
 
 Run tests:
 ```bash
-npm run test          # Run all 308 tests
+npm run test          # Run all 334 tests
 npm run gateway:test  # Proxy-gateway smoke tests (3 tests)
 npm run test:watch   # Watch mode
 ```

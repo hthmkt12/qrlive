@@ -19,6 +19,10 @@ All significant changes, features, and fixes documented here.
 - Closed the remaining CSV formula-injection gap for values prefixed by spaces or line breaks, and made bulk CSV parsing count quoted multiline rows correctly
 - Clarified analytics country filtering so the selector scopes referer breakdown/export metadata without mixing filtered and global dashboard totals
 
+### Improved
+- Added first-class `npm run test:coverage` support in repo scripts and expanded Vitest coverage to include redirect/cache helpers plus the Cloudflare Worker
+- Added regression tests for browser-side Redis cache invalidation and analytics export actions, lifting visibility into cache/webhook/analytics V2 quality after recent feature work
+
 ### Planned Features
 - User guide
 
