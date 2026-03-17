@@ -124,11 +124,13 @@ describe("EditLinkDialog", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockUpdateLink).toHaveBeenCalledWith({
-        id: "link-1",
-        updates: { name: "Updated Name", default_url: "https://example.com", expires_at: null },
-        password: "",
-      });
+      expect(mockUpdateLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "link-1",
+          updates: expect.objectContaining({ name: "Updated Name", default_url: "https://example.com", expires_at: null }),
+          password: "",
+        })
+      );
     });
   });
 

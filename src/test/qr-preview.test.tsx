@@ -80,9 +80,10 @@ describe("QRPreview", () => {
     expect(screen.getByText("Copy link")).toBeInTheDocument();
   });
 
-  it("renders download button", () => {
+  it("renders download buttons (PNG + SVG)", () => {
     renderQR();
-    expect(screen.getByText("Tải QR")).toBeInTheDocument();
+    expect(screen.getByText("PNG")).toBeInTheDocument();
+    expect(screen.getByText("SVG")).toBeInTheDocument();
   });
 
   it("shows toast and updates state on copy click", async () => {

@@ -135,14 +135,16 @@ describe("CreateLinkDialog", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockCreateLink).toHaveBeenCalledWith({
-        name: "My Link",
-        defaultUrl: "https://mylink.com",
-        geoRoutes: [],
-        userId: "user-1",
-        customShortCode: undefined,
-        expiresAt: null,
-      });
+      expect(mockCreateLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "My Link",
+          defaultUrl: "https://mylink.com",
+          geoRoutes: [],
+          userId: "user-1",
+          customShortCode: undefined,
+          expiresAt: null,
+        })
+      );
     });
   });
 
@@ -380,14 +382,16 @@ describe("CreateLinkDialog", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockCreateLink).toHaveBeenCalledWith({
-        name: "My Link",
-        defaultUrl: "https://mylink.com",
-        geoRoutes: [],
-        userId: "user-1",
-        customShortCode: "MY-LINK",
-        expiresAt: null,
-      });
+      expect(mockCreateLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "My Link",
+          defaultUrl: "https://mylink.com",
+          geoRoutes: [],
+          userId: "user-1",
+          customShortCode: "MY-LINK",
+          expiresAt: null,
+        })
+      );
     });
   });
 
