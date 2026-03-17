@@ -9,10 +9,57 @@ All significant changes, features, and fixes documented here.
 ## [Unreleased]
 
 ### Planned Features
-- E2E tests (Playwright)
-- Country-specific analytics filtering (pie chart → detail page)
-- QR code customization (colors, logo, border)
-- Bulk import/export functionality
+- Referer breakdown by country
+- CI wiring for credentialed Playwright dashboard flows
+- API documentation / user guide
+
+---
+
+## [2026-03-17-v1.4] — QR Persistence, Analytics Export, Sentry, Bulk Ops & Playwright
+
+### Added
+- **QR config persistence**
+  - Added `qr_config` JSONB persistence path for QR colors, logo URL, border style, and error level
+  - Wired QR config through link create/update mutations
+  - Added SVG download path in `QRPreview`
+
+- **Analytics enhancements**
+  - Added StatsPanel country filter
+  - Added quick range toggles (7/30/90 ngày + custom)
+  - Added analytics CSV export
+  - Added analytics PDF export via browser print flow
+
+- **Error tracking**
+  - Added `@sentry/react` initialization in `src/lib/sentry-config.ts`
+  - Added app-level `Sentry.ErrorBoundary`
+  - Enabled Browser Tracing + Replay sampling when `VITE_SENTRY_DSN` is present
+
+- **Bulk operations**
+  - Added dashboard CSV export for links
+  - Added CSV import dialog with drag-drop upload
+  - Added row validation, preview table, grouped import, and progress UI
+
+- **Playwright E2E suite**
+  - Added `playwright.config.ts` with Chromium-only project and auto-started dev server
+  - Added feature specs for auth, link CRUD, QR customization, analytics, and bulk operations
+  - Added shared Playwright helpers for credential lookup and dashboard flows
+
+### Fixed
+- Updated 7 existing tests for the new `qrConfig` parameter and QR persistence behavior
+- Applied remote migrations for `has_password` and `qr_config` so the live Supabase schema matches the shipped app code
+- Fixed `QRPreview` PNG export by avoiding the `Image` icon / `window.Image` constructor name collision
+- Improved LinkCard action-button clickability for toggle/delete flows
+- Tightened Playwright specs around dashboard auth gating, analytics filters, and QR action coverage
+
+### Notes
+- Credentialed dashboard E2E requires `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` in `.env.local` or shell env
+- Local seeded run verified the suite executes end-to-end with `qrlive.e2e@example.com`; auth-gated specs still skip cleanly when credentials are absent
+
+### Status Summary
+- **Unit / integration tests**: 289/289 passing ✅
+- **Playwright**: 27 passed, 4 intentional skips in local Chromium run with seeded auth env
+- **Build**: Clean
+- **Typecheck**: 0 errors
 
 ---
 
@@ -227,6 +274,7 @@ All significant changes, features, and fixes documented here.
 | v1.2 | 2026-03-16 | Released | 159 | ~74% |
 | v1.2-coverage-push | 2026-03-16 | Released | 269 | 93.34% ✅ |
 | v1.3 | 2026-03-16 | Released | 289 | — (handler extraction + code split) |
+| v1.4 | 2026-03-17 | Released | 289 + Playwright suite | — (QR persistence, exports, Sentry, bulk ops, E2E) |
 
 ---
 
@@ -257,7 +305,7 @@ None documented. All releases maintain backward compatibility.
 - ✅ Page components: Tests complete (30+ tests)
 - ✅ Redirect handler: Direct tests complete (13 tests) — exercises real edge logic
 - Integration tests: Not yet written (planned)
-- E2E tests: Playwright fixtures exist but not in CI
+- E2E tests: Playwright suite added; credentialed local dashboard flows verified, CI wiring still pending
 
 ### Analytics
 - ✅ Date range filtering implemented
@@ -267,8 +315,8 @@ None documented. All releases maintain backward compatibility.
 ### Features
 - ✅ Link expiration dates implemented
 - ✅ Password-protected links implemented
-- No QR code customization
-- No bulk import/export
+- ✅ QR code customization persistence implemented
+- ✅ Bulk import/export implemented
 
 ---
 
@@ -303,4 +351,4 @@ None yet.
 **Project Owner**: hthmkt12
 **Repository**: https://github.com/hthmkt12/qrlive
 **Live URL**: https://qrlive.vercel.app
-**Last Updated**: 2026-03-16
+**Last Updated**: 2026-03-17

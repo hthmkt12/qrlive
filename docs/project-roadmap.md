@@ -2,7 +2,8 @@
 
 **Project**: QRLive — Dynamic QR Code Link Shortener
 **Current Status**: MVP Complete & Deployed
-**Last Updated**: 2026-03-16
+**Last Updated**: 2026-03-17
+**Overall Progress**: 100% (14/14 shipped phases complete)
 **Repository**: hthmkt12/qrlive
 **Live URL**: https://qrlive.vercel.app
 
@@ -112,6 +113,37 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Analytics tracking (bypass or direct)
 - [x] Optional custom short codes (validated + uniqueness checked)
 
+### Phase 10: QR Customization Persistence ✅
+- [x] `qr_config` JSONB column on `qr_links`
+- [x] Save/load QR foreground, background, logo URL, border style, error level
+- [x] QR config wired through create/update mutations
+- [x] SVG download support in QR preview
+
+### Phase 11: Analytics Enhancements ✅
+- [x] Country filter in StatsPanel
+- [x] Quick range toggles (7/30/90 ngày + custom)
+- [x] CSV export for analytics detail
+- [x] PDF export via browser print flow
+
+### Phase 12: Error Tracking (Sentry) ✅
+- [x] `@sentry/react` initialization
+- [x] React error boundary at app root
+- [x] Browser tracing integration
+- [x] Session replay sampling for production diagnostics
+
+### Phase 13: Bulk Operations ✅
+- [x] Bulk CSV export for dashboard links
+- [x] Bulk CSV import dialog with drag-drop upload
+- [x] CSV parsing + per-row validation
+- [x] Preview table + import progress + result summary
+
+### Phase 14: E2E Tests ✅
+- [x] Playwright config with Chromium-only project
+- [x] Auto-start dev server via `webServer`
+- [x] Auth, CRUD, QR, analytics, bulk operation specs under `e2e/`
+- [x] Auth-gated specs skip cleanly until `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are configured
+- [x] Credentialed local run verified with seeded Supabase Auth user (`27 passed`, `4 skipped`)
+
 ---
 
 ## In-Progress Features
@@ -160,9 +192,7 @@ None currently blocking.
 
 ### Low Priority
 - [ ] API documentation (OpenAPI/Swagger)
-- [ ] Advanced analytics filtering (date range, country filter)
-- [ ] Bulk import/export functionality
-- [ ] E2E tests (Playwright fixtures exist)
+- [ ] Full deployed edge-function E2E verification with seeded test account
 
 ---
 
@@ -187,22 +217,22 @@ None currently blocking.
 
 ### Q2 2026 Goals
 
-#### 1. Advanced Analytics ✅ (COMPLETED 2026-03-16)
+#### 1. Advanced Analytics ✅ (COMPLETED 2026-03-17)
 - [x] Date range filtering (analytics-date-range-picker.tsx + RPC)
-- [ ] Country-specific filtering (pie chart → detail page)
+- [x] Country-specific filtering (dashboard StatsPanel dropdown)
 - [ ] Referer breakdown by country
-- [ ] Click trend analysis (7-day, 30-day views)
-- [ ] Export analytics (CSV, PDF)
+- [x] Click trend analysis (7-day, 30-day, 90-day views)
+- [x] Export analytics (CSV, PDF)
 
-**Effort**: 1-2 weeks | **Impact**: High (user engagement) | **Status**: Date filtering ✅, rest pending
+**Effort**: 1-2 weeks | **Impact**: High (user engagement) | **Status**: Core delivery complete, referer-by-country still pending
 
-#### 2. Link Management Enhancements ✅ (EXPIRATION + PASSWORD COMPLETED 2026-03-16)
+#### 2. Link Management Enhancements ✅ (COMPLETED 2026-03-17)
 - [x] Link expiration dates (auto-disable after date) ✅
 - [x] Password protection on links (prompt before redirect) ✅
-- [ ] QR code customization (colors, logo, border)
-- [ ] Bulk operations (import/export CSV)
+- [x] QR code customization (colors, logo, border)
+- [x] Bulk operations (import/export CSV)
 
-**Effort**: 2-3 weeks | **Impact**: High (feature parity) | **Status**: Expiration + Password ✅, rest pending
+**Effort**: 2-3 weeks | **Impact**: High (feature parity) | **Status**: Complete
 
 #### 3. Team Collaboration
 - [ ] Organizations/workspaces
@@ -224,7 +254,7 @@ None currently blocking.
 #### 5. Performance & Reliability
 - [ ] Database read replicas (scale analytics queries)
 - [ ] Caching layer (Redis for hot links)
-- [ ] Error tracking (Sentry)
+- [x] Error tracking (Sentry)
 - [ ] Performance monitoring (Datadog)
 - [ ] Distributed tracing
 
@@ -261,10 +291,11 @@ None currently blocking.
 - ✅ Redirect integration via simulator (42 tests)
 - ✅ Redirect handler direct tests (13 tests) — exercises real edge logic via SupabaseAdapter mock
 - ✅ Vitest sanity test (1 test)
+- ✅ Playwright E2E suite scaffolded and executed locally (Chromium, auth-gated dashboard flows + redirect smoke coverage)
 
 ### Remaining (before 1.0 release)
 - [ ] Integration tests (create link → redirect → analytics)
-- [ ] E2E tests (Playwright)
+- [ ] CI wiring for credentialed Playwright dashboard flows
 - [ ] Full end-to-end deployed edge function tests
 
 **Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-16) | 289 tests across 20 files
@@ -383,8 +414,8 @@ None identified.
 - [x] Page component tests ✅ (2026-03-16: 30+ page tests)
 - [x] Link expiration ✅ (2026-03-16: expires_at field + validation)
 - [x] Password-protected links ✅ (2026-03-16: PBKDF2-HMAC-SHA256 hashing + constant-time verify + legacy compat)
-- [x] Advanced analytics ✅ (2026-03-16: date range filtering)
-- [ ] E2E tests with Playwright
+- [x] Advanced analytics ✅ (2026-03-17: country filter + export + quick ranges)
+- [x] E2E tests with Playwright ✅ (2026-03-17: auth/CRUD/QR/analytics/bulk specs)
 - [ ] API documentation
 - [ ] User guide
 

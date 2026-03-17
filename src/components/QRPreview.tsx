@@ -1,17 +1,22 @@
 import { QRCodeSVG } from "qrcode.react";
 import { motion } from "framer-motion";
-import { Download, Copy, Check, Image } from "lucide-react";
+import { Download, Copy, Check, Image as ImageIcon, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getRedirectUrl } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import type { QrConfig } from "@/lib/db/models";
 
 interface QRPreviewProps {
   url: string;
   shortCode: string;
   name: string;
+  /** Saved QR config — used as initial state. null/undefined = use defaults */
+  qrConfig?: QrConfig | null;
+  /** Called whenever the user changes any QR customization setting */
+  onConfigChange?: (config: QrConfig) => void;
 }
 
 type ErrorLevel = "L" | "M" | "Q" | "H";
@@ -33,18 +38,57 @@ const BORDER_STYLES = [
   { label: "Đổ bóng",  className: "rounded-2xl border border-border bg-card p-6 shadow-xl shadow-primary/20" },
 ] as const;
 
-export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
+const DEFAULT_FG = PRESETS[0].fg;
+const DEFAULT_BG = PRESETS[0].bg;
+const DEFAULT_BORDER = BORDER_STYLES[0].className;
+const DEFAULT_ERROR_LEVEL: ErrorLevel = "H";
+
+function triggerDownload(filename: string, href: string) {
+  const anchor = document.createElement("a");
+  anchor.download = filename;
+  anchor.href = href;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+export function QRPreview({ url, shortCode, name, qrConfig, onConfigChange }: QRPreviewProps) {
   const [copied, setCopied] = useState(false);
-  const [fgColor, setFgColor] = useState(PRESETS[0].fg);
-  const [bgColor, setBgColor] = useState(PRESETS[0].bg);
-  const [errorLevel, setErrorLevel] = useState<ErrorLevel>("H");
-  const [borderStyle, setBorderStyle] = useState(BORDER_STYLES[0].className);
-  const [logoUrl, setLogoUrl] = useState("");
-  const [showLogoInput, setShowLogoInput] = useState(false);
+  // Initialize from saved config or defaults
+  const [fgColor, setFgColor] = useState(qrConfig?.fgColor ?? DEFAULT_FG);
+  const [bgColor, setBgColor] = useState(qrConfig?.bgColor ?? DEFAULT_BG);
+  const [errorLevel, setErrorLevel] = useState<ErrorLevel>((qrConfig?.errorLevel as ErrorLevel) ?? DEFAULT_ERROR_LEVEL);
+  const [borderStyle, setBorderStyle] = useState(qrConfig?.borderStyle ?? DEFAULT_BORDER);
+  const [logoUrl, setLogoUrl] = useState(qrConfig?.logoUrl ?? "");
+  const [showLogoInput, setShowLogoInput] = useState(Boolean(qrConfig?.logoUrl));
   const { toast } = useToast();
   const qrRef = useRef<HTMLDivElement>(null);
 
   const wrapperUrl = getRedirectUrl(shortCode);
+
+  /** Notify parent of config changes after any state update */
+  const notifyChange = (patch: Partial<QrConfig>) => {
+    onConfigChange?.({
+      fgColor,
+      bgColor,
+      errorLevel,
+      borderStyle,
+      logoUrl: logoUrl || undefined,
+      ...patch,
+    });
+  };
+
+  const handleFgChange = (v: string) => { setFgColor(v); notifyChange({ fgColor: v }); };
+  const handleBgChange = (v: string) => { setBgColor(v); notifyChange({ bgColor: v }); };
+  const handleErrorChange = (v: ErrorLevel) => { setErrorLevel(v); notifyChange({ errorLevel: v }); };
+  const handleBorderChange = (v: string) => { setBorderStyle(v); notifyChange({ borderStyle: v }); };
+  const handleLogoChange = (v: string) => { setLogoUrl(v); notifyChange({ logoUrl: v || undefined }); };
+
+  const handlePreset = (fg: string, bg: string) => {
+    setFgColor(fg);
+    setBgColor(bg);
+    notifyChange({ fgColor: fg, bgColor: bg });
+  };
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(wrapperUrl);
@@ -53,7 +97,8 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
+  /** Download QR as PNG (rasterized via canvas) */
+  const handleDownloadPng = () => {
     const svg = qrRef.current?.querySelector("svg");
     if (!svg) return;
     const svgData = new XMLSerializer().serializeToString(svg);
@@ -66,17 +111,25 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
       ctx!.fillStyle = bgColor;
       ctx?.fillRect(0, 0, 512, 512);
       ctx?.drawImage(img, 32, 32, 448, 448);
-      const a = document.createElement("a");
-      a.download = `qr-${name || shortCode}.png`;
-      a.href = canvas.toDataURL("image/png");
-      a.click();
+      triggerDownload(`qr-${name || shortCode}.png`, canvas.toDataURL("image/png"));
     };
-    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  /** Download QR as SVG (serialize directly — no canvas needed) */
+  const handleDownloadSvg = () => {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(`qr-${name || shortCode}.svg`, url);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   const activePreset = PRESETS.find((p) => p.fg === fgColor && p.bg === bgColor);
 
-  // Logo image settings — only applied when URL is provided; use error level H for better logo coverage
+  // Logo image settings — only applied when URL is provided
   const imageSettings = logoUrl
     ? { src: logoUrl, height: 40, width: 40, excavate: true }
     : undefined;
@@ -87,7 +140,7 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
       animate={{ scale: 1, opacity: 1 }}
       className="flex flex-col items-center gap-4"
     >
-      <div ref={qrRef} className={borderStyle}>
+      <div ref={qrRef} className={borderStyle} data-testid="qr-preview">
         <QRCodeSVG
           value={wrapperUrl}
           size={200}
@@ -106,8 +159,10 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
           {PRESETS.map((p) => (
             <button
               key={p.label}
+              type="button"
               title={p.label}
-              onClick={() => { setFgColor(p.fg); setBgColor(p.bg); }}
+              aria-label={p.label}
+              onClick={() => handlePreset(p.fg, p.bg)}
               className={cn(
                 "w-7 h-7 rounded-full border-2 transition-all",
                 activePreset?.label === p.label
@@ -126,7 +181,7 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
             <input
               type="color"
               value={fgColor}
-              onChange={(e) => setFgColor(e.target.value)}
+              onChange={(e) => handleFgChange(e.target.value)}
               className="w-7 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
             />
           </label>
@@ -135,13 +190,13 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
             <input
               type="color"
               value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
+              onChange={(e) => handleBgChange(e.target.value)}
               className="w-7 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
             />
           </label>
           <select
             value={errorLevel}
-            onChange={(e) => setErrorLevel(e.target.value as ErrorLevel)}
+            onChange={(e) => handleErrorChange(e.target.value as ErrorLevel)}
             className="ml-auto h-7 rounded border border-border bg-secondary px-2 text-xs"
           >
             <option value="L">Mức L</option>
@@ -157,7 +212,8 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
           {BORDER_STYLES.map((b) => (
             <button
               key={b.label}
-              onClick={() => setBorderStyle(b.className)}
+              type="button"
+              onClick={() => handleBorderChange(b.className)}
               className={cn(
                 "px-2 py-0.5 rounded border text-xs transition-colors",
                 borderStyle === b.className
@@ -170,6 +226,7 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
           ))}
           {/* Logo toggle */}
           <button
+            type="button"
             onClick={() => setShowLogoInput((v) => !v)}
             className={cn(
               "ml-auto flex items-center gap-1 px-2 py-0.5 rounded border text-xs transition-colors",
@@ -179,7 +236,7 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
             )}
             title="Thêm logo vào giữa QR"
           >
-            <Image className="h-3 w-3" /> Logo
+            <ImageIcon className="h-3 w-3" /> Logo
           </button>
         </div>
 
@@ -189,12 +246,13 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
             <Input
               placeholder="URL logo (https://...)"
               value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
+              onChange={(e) => handleLogoChange(e.target.value)}
               className="h-7 text-xs"
             />
             {logoUrl && (
               <button
-                onClick={() => setLogoUrl("")}
+                type="button"
+                onClick={() => handleLogoChange("")}
                 className="text-xs text-muted-foreground hover:text-foreground shrink-0"
               >
                 Xóa
@@ -214,9 +272,13 @@ export function QRPreview({ url, shortCode, name }: QRPreviewProps) {
           {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
           {copied ? "Đã copy" : "Copy link"}
         </Button>
-        <Button variant="outline" size="sm" className="flex-1" onClick={handleDownload}>
+        <Button variant="outline" size="sm" onClick={handleDownloadPng} title="Tải PNG">
           <Download className="h-4 w-4 mr-1" />
-          Tải QR
+          PNG
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleDownloadSvg} title="Tải SVG">
+          <FileImage className="h-4 w-4 mr-1" />
+          SVG
         </Button>
       </div>
     </motion.div>

@@ -70,7 +70,7 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
       }`}
     >
       <div className="flex gap-4">
-        <div className="flex-shrink-0 rounded-lg border border-border bg-secondary/50 p-2">
+        <div className="pointer-events-none flex-shrink-0 rounded-lg border border-border bg-secondary/50 p-2">
           <QRCodeSVG
             value={wrapperUrl}
             size={64}
@@ -91,13 +91,15 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
               </h3>
               <p className="font-mono text-xs text-primary truncate">{wrapperUrl}</p>
             </div>
-            <div className="flex gap-1">
+            <div className="relative z-10 flex gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
                 onClick={handleToggle}
                 disabled={toggleActive.isPending}
+                title={link.is_active ? "Tạm dừng link" : "Kích hoạt link"}
+                aria-label={link.is_active ? "Tạm dừng link" : "Kích hoạt link"}
               >
                 {link.is_active ? (
                   <ToggleRight className="h-4 w-4 text-success" />
@@ -112,6 +114,8 @@ export function LinkCard({ link, analytics, analyticsLoading = false, onSelect, 
                     size="icon"
                     className="h-8 w-8"
                     disabled={deleteLink.isPending}
+                    title="Xóa link"
+                    aria-label="Xóa link"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
