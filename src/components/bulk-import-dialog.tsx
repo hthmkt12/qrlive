@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/auth-context";
-import { parseCSV, validateCSVRows, groupRowsIntoLinks } from "@/lib/bulk-operations-utils";
+import { countCSVRows, parseCSV, validateCSVRows, groupRowsIntoLinks } from "@/lib/bulk-operations-utils";
 import type { CSVRow } from "@/lib/bulk-operations-schemas";
 import { useBulkCreateLinks } from "@/hooks/use-link-mutations";
 import { BulkImportPreviewTable } from "@/components/bulk-import-preview-table";
@@ -63,10 +63,7 @@ export function BulkImportDialog() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const rowCount = Math.max(
-        text.split(/\r?\n/).filter((line) => line.trim() !== "").length - 1,
-        0
-      );
+      const rowCount = countCSVRows(text);
       if (rowCount > MAX_CSV_ROWS) {
         toast({
           title: "CSV có quá nhiều dòng",

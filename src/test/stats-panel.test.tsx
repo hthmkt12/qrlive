@@ -24,7 +24,7 @@ vi.mock("framer-motion", () => ({
 
 vi.mock("@/components/ui/select", () => ({
   Select: ({ value, onValueChange, children }: any) => (
-    <select aria-label="Lọc theo quốc gia" value={value} onChange={(event) => onValueChange(event.target.value)}>
+    <select aria-label="Lọc nguồn truy cập theo quốc gia" value={value} onChange={(event) => onValueChange(event.target.value)}>
       {children}
     </select>
   ),
@@ -209,7 +209,7 @@ describe("StatsPanel", () => {
       />
     );
 
-    await user.selectOptions(screen.getByLabelText("Lọc theo quốc gia"), "VN");
+    await user.selectOptions(screen.getByLabelText("Lọc nguồn truy cập theo quốc gia"), "VN");
 
     expect(mockUseLinkAnalyticsDetailV2).toHaveBeenLastCalledWith(
       "link-1",
@@ -217,6 +217,22 @@ describe("StatsPanel", () => {
       expect.any(String),
       "VN"
     );
+  });
+
+  it("keeps summary cards global when selecting a referer country filter", async () => {
+    const user = userEvent.setup();
+    render(
+      <StatsPanel
+        link={mockLink}
+        analytics={mockAnalyticsDetail}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.selectOptions(screen.getByLabelText("Lọc nguồn truy cập theo quốc gia"), "VN");
+
+    expect(screen.getByText("100")).toBeInTheDocument();
+    expect(screen.getByText("15")).toBeInTheDocument();
   });
 
   it("displays loading state when isLoading is true", () => {

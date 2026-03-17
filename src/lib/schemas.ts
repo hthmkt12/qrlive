@@ -1,5 +1,33 @@
 import { z } from "zod";
 
+const BLOCKED_WEBHOOK_HOSTS = new Set(["localhost"]);
+const BLOCKED_WEBHOOK_SUFFIXES = [".internal", ".lan", ".local", ".localhost", ".home"];
+
+function normalizeWebhookHostname(hostname: string) {
+  return hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
+}
+
+function isIPv4Literal(hostname: string) {
+  const octets = hostname.split(".");
+  if (octets.length !== 4) return false;
+  return octets.every((octet) => /^\d+$/.test(octet) && Number(octet) >= 0 && Number(octet) <= 255);
+}
+
+function isSafeWebhookUrl(value: string) {
+  let target: URL;
+  try {
+    target = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const hostname = normalizeWebhookHostname(target.hostname);
+  if (!hostname || !hostname.includes(".")) return false;
+  if (BLOCKED_WEBHOOK_HOSTS.has(hostname)) return false;
+  if (BLOCKED_WEBHOOK_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) return false;
+  return !isIPv4Literal(hostname) && !hostname.includes(":");
+}
+
 const webhookUrlSchema = z.preprocess(
   (value) => typeof value === "string" ? value.trim() : value,
   z.union([
@@ -9,6 +37,10 @@ const webhookUrlSchema = z.preprocess(
       .refine(
         (value) => /^https?:\/\//i.test(value),
         "Webhook URL phải bắt đầu bằng http:// hoặc https://"
+      )
+      .refine(
+        (value) => isSafeWebhookUrl(value),
+        "Webhook URL phải dùng domain public, không dùng localhost hoặc địa chỉ IP"
       ),
   ])
 );

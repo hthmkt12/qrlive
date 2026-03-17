@@ -17,6 +17,7 @@ describe("link-cache-invalidate-handler", () => {
     const result = await handleLinkCacheInvalidation({ method: "OPTIONS" }, makeAdapter());
     expect(result.status).toBe(200);
     expect(result.headers["Access-Control-Allow-Origin"]).toBe("*");
+    expect(result.headers["Access-Control-Allow-Methods"]).toBe("POST, OPTIONS");
   });
 
   it("rejects non-POST methods", async () => {

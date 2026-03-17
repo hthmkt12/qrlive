@@ -238,4 +238,27 @@ describe("redirect-handler (real logic)", () => {
       expect.stringContaining("Click webhook delivery failed for https://hooks.example.com/fail")
     );
   });
+
+  it("does not fetch blocked webhook targets and still completes the redirect", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const queued: Promise<void>[] = [];
+    const fetchImpl = vi.fn();
+    const res = await handleRedirect(
+      makeReq(),
+      makeAdapter({
+        fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "http://127.0.0.1:8080/hook" })),
+      }),
+      {
+        fetchImpl,
+        queueBackgroundTask: (task) => queued.push(task),
+      }
+    );
+
+    expect(res.status).toBe(302);
+    await Promise.all(queued);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("Click webhook delivery failed for http://127.0.0.1:8080/hook")
+    );
+  });
 });

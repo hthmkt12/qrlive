@@ -73,4 +73,13 @@ describe("linkFormSchema", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe("Webhook URL phải bắt đầu bằng http:// hoặc https://");
   });
+
+  it("rejects localhost and IP-based webhook URLs", () => {
+    const localhost = linkFormSchema.safeParse({ ...valid, webhookUrl: "https://localhost:3000/hook" });
+    const ipLiteral = linkFormSchema.safeParse({ ...valid, webhookUrl: "http://127.0.0.1:8080/hook" });
+    expect(localhost.success).toBe(false);
+    expect(ipLiteral.success).toBe(false);
+    expect(localhost.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng domain public, không dùng localhost hoặc địa chỉ IP");
+    expect(ipLiteral.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng domain public, không dùng localhost hoặc địa chỉ IP");
+  });
 });

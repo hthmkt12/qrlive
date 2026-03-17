@@ -13,6 +13,12 @@ All significant changes, features, and fixes documented here.
 - Real referer breakdown per country via `get_link_click_detail_v3`, wired through analytics query cache keys and StatsPanel country filtering
 - Optional Redis caching for hot public links in the redirect edge function, plus authenticated cache invalidation after dashboard link edits, toggles, geo-route changes, and deletes
 
+### Fixed
+- Hardened click webhooks by rejecting localhost, IP-literal, and non-public hostnames before the redirect edge function issues outbound fetches
+- Completed Redis cache invalidation preflight headers so browser-triggered purge requests do not silently fail on CORS
+- Closed the remaining CSV formula-injection gap for values prefixed by spaces or line breaks, and made bulk CSV parsing count quoted multiline rows correctly
+- Clarified analytics country filtering so the selector scopes referer breakdown/export metadata without mixing filtered and global dashboard totals
+
 ### Planned Features
 - User guide
 

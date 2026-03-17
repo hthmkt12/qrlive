@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateAnalyticsCSV, sanitizeCSVValue } from "@/lib/analytics-export-utils";
-import { generateLinksCSV } from "@/lib/bulk-operations-utils";
+import { countCSVRows, generateLinksCSV, parseCSV } from "@/lib/bulk-operations-utils";
 import { LinkAnalyticsDetailRow, QRLinkRow } from "@/lib/db";
 
 const analytics: LinkAnalyticsDetailRow = {
@@ -17,12 +17,14 @@ describe("CSV export sanitization", () => {
   it("prefixes dangerous spreadsheet formulas", () => {
     expect(sanitizeCSVValue("=SUM(A1:A2)")).toBe("'=SUM(A1:A2)");
     expect(sanitizeCSVValue("+payload")).toBe("'+payload");
+    expect(sanitizeCSVValue("\n=CMD()")).toBe("'\n=CMD()");
     expect(sanitizeCSVValue("safe")).toBe("safe");
   });
 
   it("sanitizes analytics export metadata and referers", () => {
-    const csv = generateAnalyticsCSV(analytics, "@Campaign");
+    const csv = generateAnalyticsCSV(analytics, "@Campaign", "🇻🇳 Việt Nam");
     expect(csv).toContain("# Analytics export for: '@Campaign");
+    expect(csv).toContain("# Referer filtered by country: 🇻🇳 Việt Nam");
     expect(csv).toContain("'=CMD(),2");
   });
 
@@ -47,5 +49,13 @@ describe("CSV export sanitization", () => {
     }];
 
     expect(generateLinksCSV(links)).toContain("\"'=IMPORTXML(\"\"http://evil\"\")\"");
+  });
+
+  it("parses quoted multiline CSV fields as a single row", () => {
+    const csv = 'name,default_url\n"Chiến dịch\nMùa hè",https://example.com';
+    expect(countCSVRows(csv)).toBe(1);
+    expect(parseCSV(csv)).toEqual([
+      { name: "Chiến dịch\nMùa hè", default_url: "https://example.com" },
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildClickWebhookPayload,
   dispatchClickWebhook,
+  validateWebhookUrl,
 } from "../../supabase/functions/redirect/click-webhook";
 
 describe("click webhook helpers", () => {
@@ -79,5 +80,23 @@ describe("click webhook helpers", () => {
         fetchImpl
       )
     ).rejects.toThrow("WEBHOOK_HTTP_500");
+  });
+
+  it("rejects localhost and IP-literal webhook targets before any fetch", async () => {
+    const fetchImpl = vi.fn();
+    const payload = buildClickWebhookPayload({
+      countryCode: "US",
+      defaultUrl: "https://example.com",
+      linkId: "link-1",
+      linkName: "Launch",
+      occurredAt: "2026-03-17T10:00:00.000Z",
+      redirectUrl: "https://example.com",
+      referer: "direct",
+      shortCode: "LAUNCH",
+    });
+
+    await expect(dispatchClickWebhook("http://127.0.0.1:8080/hook", payload, fetchImpl)).rejects.toThrow("WEBHOOK_URL_BLOCKED");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(() => validateWebhookUrl("https://localhost/webhook")).toThrow("WEBHOOK_URL_BLOCKED");
   });
 });

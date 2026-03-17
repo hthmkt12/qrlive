@@ -18,11 +18,17 @@ interface AnalyticsExportButtonProps {
   analytics: LinkAnalyticsDetailRow;
   linkName: string;
   shortCode: string;
+  refererCountryLabel?: string | null;
 }
 
-export function AnalyticsExportButton({ analytics, linkName, shortCode }: AnalyticsExportButtonProps) {
+export function AnalyticsExportButton({
+  analytics,
+  linkName,
+  shortCode,
+  refererCountryLabel,
+}: AnalyticsExportButtonProps) {
   function handleCSVExport() {
-    const csv = generateAnalyticsCSV(analytics, linkName);
+    const csv = generateAnalyticsCSV(analytics, linkName, refererCountryLabel);
     const date = new Date().toISOString().split("T")[0];
     triggerCSVDownload(csv, `analytics-${shortCode}-${date}.csv`);
   }

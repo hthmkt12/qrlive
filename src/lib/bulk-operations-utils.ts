@@ -2,28 +2,14 @@
 import { csvRowSchema, type CSVRow, type GroupedLink } from "./bulk-operations-schemas";
 import type { QRLinkRow } from "./db/models";
 
-// CSV header columns in order
-const CSV_HEADERS = [
-  "name",
-  "default_url",
-  "custom_short_code",
-  "expires_at",
-  "geo_country_code",
-  "geo_target_url",
-  "geo_bypass_url",
-] as const;
+const CSV_HEADERS = ["name", "default_url", "custom_short_code", "expires_at", "geo_country_code", "geo_target_url", "geo_bypass_url"] as const;
 
-/** Parse a single CSV field — handles quoted fields containing commas/newlines */
 function parseField(raw: string): string {
   const trimmed = raw.trim();
-  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    // Remove surrounding quotes and unescape doubled quotes
-    return trimmed.slice(1, -1).replace(/""/g, '"');
-  }
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) return trimmed.slice(1, -1).replace(/""/g, '"');
   return trimmed;
 }
 
-/** Split a CSV line into fields — respects quoted fields with embedded commas */
 function splitCSVLine(line: string): string[] {
   const fields: string[] = [];
   let current = "";
@@ -34,7 +20,7 @@ function splitCSVLine(line: string): string[] {
     if (ch === '"') {
       if (inQuotes && line[i + 1] === '"') {
         current += '"';
-        i++; // skip escaped quote
+        i++;
       } else {
         inQuotes = !inQuotes;
       }
@@ -49,12 +35,45 @@ function splitCSVLine(line: string): string[] {
   return fields;
 }
 
-/** Parse raw CSV text into an array of CSVRow objects (skips header row) */
-export function parseCSV(text: string): CSVRow[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
-  if (lines.length < 2) return [];
+function splitCSVRecords(text: string): string[] {
+  const records: string[] = [];
+  let current = "";
+  let inQuotes = false;
 
-  // First line must be the header
+  for (let index = 0; index < text.length; index += 1) {
+    const ch = text[index];
+    if (ch === '"') {
+      if (inQuotes && text[index + 1] === '"') {
+        current += '""';
+        index += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += ch;
+      continue;
+    }
+
+    if (!inQuotes && (ch === "\n" || ch === "\r")) {
+      if (ch === "\r" && text[index + 1] === "\n") index += 1;
+      if (current.trim() !== "") records.push(current);
+      current = "";
+      continue;
+    }
+
+    current += ch;
+  }
+
+  if (current.trim() !== "") records.push(current);
+  return records;
+}
+
+export function countCSVRows(text: string) {
+  return Math.max(splitCSVRecords(text).length - 1, 0);
+}
+
+export function parseCSV(text: string): CSVRow[] {
+  const lines = splitCSVRecords(text);
+  if (lines.length < 2) return [];
   const headers = splitCSVLine(lines[0]).map((h) => h.toLowerCase().trim());
 
   return lines.slice(1).map((line) => {
@@ -72,7 +91,6 @@ export interface ValidationResult {
   errors: Array<{ row: number; errors: string[] }>;
 }
 
-/** Validate parsed CSV rows against csvRowSchema; returns valid rows and per-row errors */
 export function validateCSVRows(rows: CSVRow[]): ValidationResult {
   const valid: CSVRow[] = [];
   const errors: Array<{ row: number; errors: string[] }> = [];
@@ -83,7 +101,7 @@ export function validateCSVRows(rows: CSVRow[]): ValidationResult {
       valid.push(result.data);
     } else {
       errors.push({
-        row: idx + 2, // +2: 1-based + skip header
+        row: idx + 2,
         errors: result.error.issues.map((i) => i.message),
       });
     }
@@ -92,7 +110,6 @@ export function validateCSVRows(rows: CSVRow[]): ValidationResult {
   return { valid, errors };
 }
 
-/** Group CSV rows by name+custom_short_code to consolidate geo routes per link */
 export function groupRowsIntoLinks(rows: CSVRow[]): GroupedLink[] {
   const map = new Map<string, GroupedLink>();
 
@@ -111,7 +128,7 @@ export function groupRowsIntoLinks(rows: CSVRow[]): GroupedLink[] {
     if (row.geo_country_code && row.geo_target_url) {
       link.geo_routes.push({
         countryCode: row.geo_country_code,
-        country: row.geo_country_code, // use code as country name for CSV import
+        country: row.geo_country_code,
         targetUrl: row.geo_target_url,
         bypassUrl: row.geo_bypass_url ?? "",
       });
@@ -121,9 +138,9 @@ export function groupRowsIntoLinks(rows: CSVRow[]): GroupedLink[] {
   return Array.from(map.values());
 }
 
-/** Escape a CSV field value — wraps in quotes if it contains commas, quotes, or newlines */
 function sanitizeCSVValue(value: string): string {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  const trimmedPrefix = value.replace(/^[ \t\r\n]+/, "");
+  return /^[\t\r\n]/.test(value) || /^[=+\-@]/.test(trimmedPrefix) ? `'${value}` : value;
 }
 
 function escapeCSVField(value: string): string {
@@ -134,10 +151,6 @@ function escapeCSVField(value: string): string {
   return safeValue;
 }
 
-/**
- * Generate CSV text from an array of QRLinkRow objects.
- * Links with multiple geo routes produce multiple rows (same name/short_code).
- */
 export function generateLinksCSV(links: QRLinkRow[]): string {
   const rows: string[] = [CSV_HEADERS.join(",")];
 
@@ -168,7 +181,6 @@ export function generateLinksCSV(links: QRLinkRow[]): string {
   return rows.join("\n");
 }
 
-/** Trigger a browser download of CSV text as a .csv file */
 export function downloadCSV(csv: string, filename: string): void {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);

@@ -50,16 +50,6 @@ function rangeDays(range: DateRange): number {
   return Math.round(ms / 86_400_000) + 1;
 }
 
-function filterAnalyticsByCountry(analytics: LinkAnalyticsDetailRow, countryCode: string): LinkAnalyticsDetailRow {
-  if (countryCode === "all") return analytics;
-  const countryEntry = analytics.country_breakdown.find((entry) => entry.country_code === countryCode);
-  return {
-    ...analytics,
-    total_clicks: countryEntry?.clicks ?? 0,
-    country_breakdown: countryEntry ? [countryEntry] : [],
-  };
-}
-
 export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: externalLoading = false, onBack }: StatsPanelProps) {
   const [dateRange, setDateRange] = useState<DateRange>(defaultDateRange);
   const [selectedCountry, setSelectedCountry] = useState("all");
@@ -70,7 +60,6 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
     selectedCountry === "all" ? undefined : selectedCountry
   );
   const rawAnalytics = rangedAnalytics ?? fallbackAnalytics;
-  const analytics = filterAnalyticsByCountry(rawAnalytics, selectedCountry);
   const isLoading = externalLoading || rangedLoading;
   const days = rangeDays(dateRange);
   const chartData = days > 30
@@ -81,6 +70,9 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
     const country = COUNTRIES.find((item) => item.code === entry.country_code);
     return { code: entry.country_code, label: country ? `${country.flag} ${country.name}` : entry.country_code };
   });
+  const refererCountryLabel = selectedCountry === "all"
+    ? null
+    : availableCountries.find((country) => country.code === selectedCountry)?.label ?? selectedCountry;
 
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
@@ -116,7 +108,7 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-xl border border-border bg-card p-4">
               <MousePointerClick className="mb-2 h-5 w-5 text-primary" />
-              <p className="text-2xl font-bold">{isLoading ? "..." : analytics.total_clicks}</p>
+              <p className="text-2xl font-bold">{isLoading ? "..." : rawAnalytics.total_clicks}</p>
               <p className="text-xs text-muted-foreground">Tổng clicks</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
@@ -135,15 +127,20 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
             <AnalyticsDateRangePicker value={dateRange} onChange={setDateRange} />
             <div className="ml-auto flex items-center gap-2">
               <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                <SelectTrigger className="h-8 w-[160px] text-sm" aria-label="Lọc theo quốc gia">
-                  <SelectValue placeholder="Tất cả quốc gia" />
+                <SelectTrigger className="h-8 w-[180px] text-sm" aria-label="Lọc nguồn truy cập theo quốc gia">
+                  <SelectValue placeholder="Nguồn theo quốc gia" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tất cả quốc gia</SelectItem>
+                  <SelectItem value="all">Mọi nguồn truy cập</SelectItem>
                   {availableCountries.map((country) => <SelectItem key={country.code} value={country.code}>{country.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <AnalyticsExportButton analytics={analytics} linkName={link.name} shortCode={link.short_code} />
+              <AnalyticsExportButton
+                analytics={rawAnalytics}
+                linkName={link.name}
+                shortCode={link.short_code}
+                refererCountryLabel={refererCountryLabel}
+              />
             </div>
           </div>
 
@@ -151,8 +148,8 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
             <StatsCharts
               chartData={chartData}
               chartTitle={chartTitle}
-              analytics={analytics}
-              totalClicks={analytics.total_clicks}
+              analytics={rawAnalytics}
+              totalClicks={rawAnalytics.total_clicks}
               selectedCountry={selectedCountry}
             />
           </Suspense>

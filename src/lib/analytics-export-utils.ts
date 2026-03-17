@@ -3,7 +3,8 @@ import { LinkAnalyticsDetailRow } from "@/lib/db";
 import { COUNTRIES } from "@/lib/types";
 
 export function sanitizeCSVValue(value: string): string {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  const trimmedPrefix = value.replace(/^[ \t\r\n]+/, "");
+  return /^[\t\r\n]/.test(value) || /^[=+\-@]/.test(trimmedPrefix) ? `'${value}` : value;
 }
 
 function escapeCSVField(value: string): string {
@@ -15,13 +16,20 @@ function escapeCSVField(value: string): string {
 }
 
 /** Build a CSV string from analytics detail data */
-export function generateAnalyticsCSV(analytics: LinkAnalyticsDetailRow, linkName: string): string {
+export function generateAnalyticsCSV(
+  analytics: LinkAnalyticsDetailRow,
+  linkName: string,
+  refererCountryLabel?: string | null
+): string {
   const rows: string[] = [];
 
   // Header metadata
   rows.push(`# Analytics export for: ${escapeCSVField(linkName)}`);
   rows.push(`# Generated: ${new Date().toLocaleString("vi-VN")}`);
   rows.push(`# Total clicks: ${analytics.total_clicks}`);
+  if (refererCountryLabel) {
+    rows.push(`# Referer filtered by country: ${escapeCSVField(refererCountryLabel)}`);
+  }
   rows.push("");
 
   // Clicks by day section
