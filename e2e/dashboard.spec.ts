@@ -60,8 +60,10 @@ test.describe("Dashboard - Create Link Dialog", () => {
 
     await openCreateDialog(page);
 
-    await expect(page.getByPlaceholder("Ví dụ: Netflix US")).toBeVisible();
-    await expect(page.getByPlaceholder("https://example.com")).toBeVisible();
+    await expect(page.locator('input[name="name"]')).toBeVisible();
+    await expect(page.locator('input[name="defaultUrl"]')).toBeVisible();
+    await expect(page.locator('input[name="webhookUrl"]')).toBeVisible();
+    await expect(page.locator('input[name="webhookSecret"]')).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Tạo link & QR Code" }),
     ).toBeVisible();
@@ -84,7 +86,7 @@ test.describe("Dashboard - Link List", () => {
     if (count > 0) {
       await expect(cards.first()).toBeVisible();
     }
-    // No links is a valid state (empty dashboard) — no assertion needed
+    // No links is a valid state (empty dashboard) - no assertion needed
   });
 });
 

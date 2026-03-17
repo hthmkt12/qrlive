@@ -31,9 +31,11 @@ test.describe("Analytics", () => {
     await page.getByRole("button", { name: /30 ngày/i }).click();
     await expect(page.getByText("Clicks 30 ngày qua")).toBeVisible();
 
-    const countryFilter = page.getByRole("combobox", { name: "Lọc theo quốc gia" });
+    const countryFilter = page.getByRole("combobox", {
+      name: /Lọc nguồn truy cập theo quốc gia/i,
+    });
     await countryFilter.click();
-    await expect(page.getByRole("option", { name: /Tất cả quốc gia/i })).toBeVisible();
+    await expect(page.getByRole("option", { name: /Mọi nguồn truy cập/i })).toBeVisible();
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /Xuất dữ liệu/i }).click();

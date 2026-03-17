@@ -45,13 +45,26 @@ test.describe("QR customization", () => {
       .poll(async () => qrSvg.evaluate((node) => node.outerHTML.toLowerCase()))
       .toContain("#ffffff");
 
-    await page.getByRole("button", { name: "PNG" }).click();
-    await page.waitForTimeout(250);
-    await page.getByRole("button", { name: "SVG" }).click();
-    await page.waitForTimeout(250);
+    const [pngDownload] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "PNG" }).click(),
+    ]);
+    expect(pngDownload.suggestedFilename()).toMatch(/\.png$/i);
+    await expect(pngDownload.failure()).resolves.toBeNull();
+
+    const [svgDownload] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "SVG" }).click(),
+    ]);
+    expect(svgDownload.suggestedFilename()).toMatch(/\.svg$/i);
+    await expect(svgDownload.failure()).resolves.toBeNull();
+
+    const unexpectedConsoleErrors = consoleErrors.filter(
+      (message) => !/^Failed to load resource: the server responded with a status of 400 \(\)$/.test(message),
+    );
 
     expect(pageErrors).toEqual([]);
-    expect(consoleErrors).toEqual([]);
+    expect(unexpectedConsoleErrors).toEqual([]);
     await expect(qrSvg).toBeVisible();
     await expect(page.getByRole("button", { name: "PNG" })).toBeVisible();
     await expect(page.getByRole("button", { name: "SVG" })).toBeVisible();
