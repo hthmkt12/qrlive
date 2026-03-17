@@ -2,11 +2,8 @@
 # Deploy: wrangler deploy --config cloudflare-worker/wrangler.toml
 #
 # Required secrets (set via CLI, never commit):
-#   wrangler secret put SUPABASE_REDIRECT_URL
-#   Value: https://<your-supabase-project>.supabase.co/functions/v1/redirect
-#
-# Required vars (non-secret, set in [vars] or Cloudflare dashboard):
-# none currently
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_ANON_KEY
 
 name = "qrlive-redirect"
 main = "redirect-proxy.js"

@@ -3,7 +3,7 @@
 **Project**: QRLive — Dynamic QR Code Link Shortener
 **Current Status**: MVP Complete & Deployed
 **Last Updated**: 2026-03-17
-**Overall Progress**: 100% (14/14 shipped phases complete)
+**Overall Progress**: 100% (15/15 shipped phases complete)
 **Repository**: hthmkt12/qrlive
 **Live URL**: https://qrlive.vercel.app
 
@@ -90,7 +90,8 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Vitest sanity test (1 test)
 - [x] Proxy gateway smoke tests (3 tests)
 - [x] Analytics query helper tests (4 tests)
-- [x] All tests passing (289/289 across 20 test files)
+- [x] Cloudflare Worker proxy tests (19 tests) — contract, error handling
+- [x] All tests passing (308/308 across 21 test files, via `test.projects`)
 - [x] Test setup & fixtures
 
 ### Phase 08: Deployment ✅
@@ -140,9 +141,18 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 ### Phase 14: E2E Tests ✅
 - [x] Playwright config with Chromium-only project
 - [x] Auto-start dev server via `webServer`
-- [x] Auth, CRUD, QR, analytics, bulk operation specs under `e2e/`
+- [x] Auth, CRUD, QR, analytics, bulk operation, redirect specs under `e2e/`
 - [x] Auth-gated specs skip cleanly until `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are configured
-- [x] Credentialed local run verified with seeded Supabase Auth user (`27 passed`, `4 skipped`)
+- [x] Audit outcome: 30 passed, 0 skipped (all redundant skips removed)
+
+### Phase 15: Cloudflare Worker Production Setup ✅
+- [x] Rewrite `redirect-proxy.js` for `SUPABASE_URL` + `SUPABASE_ANON_KEY` (secrets via Wrangler)
+- [x] POST body forwarding for password-protected links
+- [x] Geo-routing header preservation (`cf-ipcountry`)
+- [x] Supabase auth header injection (`apikey`, `Authorization`)
+- [x] JSON error responses with fail-fast for missing secrets
+- [x] 19 Vitest tests (proxy contract, error handling) integrated via `test.projects`
+- [x] Worker README with setup/deploy instructions
 
 ---
 
@@ -161,7 +171,7 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **>80% test coverage** | ✅ 289 tests, 20 files (exceeds target) | Complete | ✅ Complete (2026-03-16) |
+| **>80% test coverage** | ✅ 308 tests, 21 files (289 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
 | **Component + hook + page + db mutation tests** | ✅ 70+ new tests added (use-links, analytics-date-range-picker, query-keys, pages-*, db-mutations) | Complete | ✅ Complete (2026-03-16) |
 | **Redirect handler direct tests** | ✅ 13 tests exercising real edge logic via extracted handler (redirect-handler.ts) | Complete | ✅ Complete (2026-03-16) |
 | **Analytics pre-aggregation/caching** | Stats panel uses aggregate RPCs; higher-volume reports may want cached rollups | Medium | Pending |
@@ -170,8 +180,8 @@ None currently blocking.
 | **Security hardening** | ✅ Crypto RNG, auth error normalization, git history cleaned, proxy F10/F13 fixed | Complete | ✅ Complete |
 
 **Details**:
-1. **Component test coverage**: ✅ Complete (2026-03-16). 53 + 12 + 18 = 83 component/hook tests.
-   - UI, hooks, pages, and data-layer tests now span 289 tests across 20 files.
+1. **Component test coverage**: ✅ Complete (2026-03-17). 53 + 12 + 18 = 83 component/hook tests.
+   - UI, hooks, pages, and data-layer tests now span 308 tests across 21 files (289 app + 19 worker).
    - Direct redirect-handler coverage was added on top of the earlier simulator tests.
 
 2. **Link expiration & password protection**: ✅ Completed (2026-03-16).
@@ -200,7 +210,7 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 289 tests, 20 files | ✅ Exceeded target (2026-03-16) |
+| **Test Coverage** | >80% | 308 tests, 21 files (289 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
 | **Build Time** | <30s | ~5s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
@@ -281,7 +291,7 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (289 tests, 20 files) ✅
+### Current Coverage (308 tests, 21 files) ✅
 - ✅ Schemas & validation (17 tests)
 - ✅ Database & data layer (57 tests)
 - ✅ Auth context (8 tests)
@@ -290,15 +300,16 @@ None currently blocking.
 - ✅ UI components (92 tests)
 - ✅ Redirect integration via simulator (42 tests)
 - ✅ Redirect handler direct tests (13 tests) — exercises real edge logic via SupabaseAdapter mock
+- ✅ Cloudflare Worker proxy tests (19 tests) — contract, headers, error handling
 - ✅ Vitest sanity test (1 test)
-- ✅ Playwright E2E suite scaffolded and executed locally (Chromium, auth-gated dashboard flows + redirect smoke coverage)
+- ✅ Playwright E2E suite: 30 passed, 0 skipped (Chromium, auth-gated dashboard flows + redirect smoke)
 
 ### Remaining (before 1.0 release)
 - [ ] Integration tests (create link → redirect → analytics)
 - [ ] CI wiring for credentialed Playwright dashboard flows
 - [ ] Full end-to-end deployed edge function tests
 
-**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-16) | 289 tests across 20 files
+**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 308 tests across 21 files
 
 ---
 
@@ -408,14 +419,14 @@ None identified.
 - [x] Bypass URL support
 
 ### V1.0 (Next Phase)
-- [x] >80% test coverage ✅ (2026-03-16: 289 tests across 20 files)
+- [x] >80% test coverage ✅ (2026-03-17: 308 tests across 21 files)
 - [x] Component tests added ✅ (2026-03-16: 51 component tests)
 - [x] Hook tests added ✅ (2026-03-16: 50+ hook tests)
 - [x] Page component tests ✅ (2026-03-16: 30+ page tests)
 - [x] Link expiration ✅ (2026-03-16: expires_at field + validation)
 - [x] Password-protected links ✅ (2026-03-16: PBKDF2-HMAC-SHA256 hashing + constant-time verify + legacy compat)
 - [x] Advanced analytics ✅ (2026-03-17: country filter + export + quick ranges)
-- [x] E2E tests with Playwright ✅ (2026-03-17: auth/CRUD/QR/analytics/bulk specs)
+- [x] E2E tests with Playwright ✅ (2026-03-17: 30 passed, 0 skipped — auth/CRUD/QR/analytics/bulk/redirect specs)
 - [ ] API documentation
 - [ ] User guide
 

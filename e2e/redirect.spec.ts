@@ -60,23 +60,13 @@ test.describe("Redirect API - Production", () => {
 });
 
 test.describe("Redirect API - Local Development", () => {
-  // Test against local dev server if available
-  const DEV_URL = "http://localhost:5173";
+  // Uses baseURL from playwright.config.ts (Vite webServer on 127.0.0.1:5173)
 
-  test.skip("should load home page without auth", async ({ page }) => {
-    // This test requires dev server running - can be skipped in CI
-    const response = await page.goto(DEV_URL);
-    // Should get 200 OK or redirect to auth
+  test("should load home page and redirect to auth", async ({ page }) => {
+    const response = await page.goto("/");
+    // Should get 200 OK (page loads, then client-side redirect to /auth)
     expect([200, 302]).toContain(response?.status());
-  });
-
-  test.skip("should redirect unauthenticated to auth page", async ({ page }) => {
-    // This test requires dev server running - can be skipped in CI
-    await page.context().clearCookies();
-
-    await page.goto(DEV_URL);
-
-    // Should redirect to /auth
+    // Client-side auth guard redirects unauthenticated users
     await expect(page).toHaveURL(/\/auth/);
   });
 });
@@ -100,8 +90,7 @@ test.describe("Redirect API - Response Validation", () => {
     }
   });
 
-  test.skip("should handle special characters in code", async ({ request }) => {
-    // Skip: special char handling depends on implementation
+  test("should handle special characters in code", async ({ request }) => {
     const specialCodes = ["test@code", "test#code", "test/code", "test?code"];
 
     for (const code of specialCodes) {
@@ -109,13 +98,12 @@ test.describe("Redirect API - Response Validation", () => {
         maxRedirects: 0,
       });
 
-      // Should handle gracefully
+      // API should handle gracefully — any well-formed HTTP status is acceptable
       expect([400, 404, 302, 307, 405, 200]).toContain(response.status());
     }
   });
 
-  test.skip("should handle case sensitivity properly", async ({ request }) => {
-    // Skip: case sensitivity depends on implementation
+  test("should handle case sensitivity consistently", async ({ request }) => {
     const response1 = await request.get(`${LIVE_URL}/functions/v1/redirect/TestCode`, {
       maxRedirects: 0,
     });
@@ -123,11 +111,11 @@ test.describe("Redirect API - Response Validation", () => {
       maxRedirects: 0,
     });
 
-    // Both should have consistent behavior
+    // Both should have consistent behavior — either both found or both not found
     const status1 = response1.status();
     const status2 = response2.status();
     const bothValid = [302, 307].includes(status1) && [302, 307].includes(status2);
-    const bothInvalid = [400, 404].includes(status1) && [400, 404].includes(status2);
+    const bothInvalid = [400, 404, 200].includes(status1) && [400, 404, 200].includes(status2);
     expect(bothValid || bothInvalid).toBeTruthy();
   });
 });

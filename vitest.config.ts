@@ -5,10 +5,28 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    projects: [
+      // React app tests (jsdom environment)
+      {
+        extends: true,
+        test: {
+          name: "app",
+          environment: "jsdom",
+          globals: true,
+          setupFiles: ["./src/test/setup.ts"],
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+        },
+      },
+      // Cloudflare Worker tests (node environment)
+      {
+        test: {
+          name: "cloudflare-worker",
+          include: ["cloudflare-worker/**/*.test.{js,ts}"],
+          environment: "node",
+          globals: true,
+        },
+      },
+    ],
     coverage: {
       provider: "v8",
       include: [

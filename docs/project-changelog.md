@@ -15,6 +15,41 @@ All significant changes, features, and fixes documented here.
 
 ---
 
+## [2026-03-17-v1.5] — Cloudflare Worker Production Setup & E2E Audit
+
+### Added
+- **Cloudflare Worker rewrite** (`cloudflare-worker/redirect-proxy.js`)
+  - Replaced hardcoded `SUPABASE_REDIRECT_URL` with `SUPABASE_URL` + `SUPABASE_ANON_KEY` secrets
+  - POST body forwarding for password-protected link submissions
+  - Geo-routing header preservation (`cf-ipcountry`, `user-agent`, `referer`)
+  - Supabase auth header injection (`apikey`, `Authorization: Bearer`)
+  - JSON error responses with fail-fast for missing secrets (500), unsupported methods (405)
+  - Both `/CODE` and `/r/CODE` path styles supported
+
+- **Worker tests** (19 tests in `cloudflare-worker/redirect-proxy.test.js`)
+  - `extractShortCode`: 5 tests (path parsing, edge cases)
+  - `buildUpstreamHeaders`: 4 tests (auth injection, header filtering)
+  - Proxy forwarding contract: 6 tests (upstream URL, auth headers, geo routing, POST body, redirect:manual)
+  - Error handling: 4 tests (missing secrets, empty code, CORS, unsupported methods)
+
+- **Vitest `test.projects` integration**
+  - Worker tests run as `cloudflare-worker` project (node env) alongside `app` project (jsdom)
+  - Single `npm test` runs all 308 tests (289 app + 19 worker)
+  - Removed deprecated `vitest.workspace.ts`
+
+### Improved
+- **E2E test audit**: reduced skips from 4 to 0 in `redirect.spec.ts`
+  - Merged duplicate local-dev smoke tests
+  - Final suite: 30 passed, 0 failed, 0 skipped
+
+### Status Summary
+- **Unit / integration tests**: 308/308 passing ✅ (289 app + 19 worker)
+- **Playwright E2E**: 30 passed, 0 skipped
+- **Build**: Clean
+- **Typecheck**: 0 errors
+
+---
+
 ## [2026-03-17-v1.4] — QR Persistence, Analytics Export, Sentry, Bulk Ops & Playwright
 
 ### Added
@@ -275,6 +310,7 @@ All significant changes, features, and fixes documented here.
 | v1.2-coverage-push | 2026-03-16 | Released | 269 | 93.34% ✅ |
 | v1.3 | 2026-03-16 | Released | 289 | — (handler extraction + code split) |
 | v1.4 | 2026-03-17 | Released | 289 + Playwright suite | — (QR persistence, exports, Sentry, bulk ops, E2E) |
+| v1.5 | 2026-03-17 | Released | 308 (289 app + 19 worker) + 30 E2E | Worker production, E2E audit |
 
 ---
 
@@ -309,7 +345,7 @@ None documented. All releases maintain backward compatibility.
 
 ### Analytics
 - ✅ Date range filtering implemented
-- Country-specific filters UI pending
+- ✅ Country-specific filters implemented (StatsPanel dropdown)
 - No cached rollups for >30-day ranges
 
 ### Features

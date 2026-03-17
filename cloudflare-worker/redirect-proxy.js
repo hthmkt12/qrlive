@@ -4,63 +4,130 @@
  * Proxies QR redirect requests through a custom domain to the Supabase Edge Function.
  * Purpose: make QR links accessible from China / regions where supabase.co is blocked.
  *
- * Deploy:
- *   1. Set env var: wrangler secret put SUPABASE_REDIRECT_URL (or add to wrangler.toml [vars])
- *   2. wrangler deploy redirect-proxy.js --name qrlive-redirect --route "r.yourdomain.com/*"
+ * Required secrets (set via wrangler secret put, never commit):
+ *   SUPABASE_URL       — e.g. https://<project>.supabase.co
+ *   SUPABASE_ANON_KEY  — Supabase anon/public key
  *
- * DNS setup:
- *   Add CNAME record: r.yourdomain.com → workers.dev (Cloudflare proxied)
- *
- * Vercel env var:
- *   VITE_REDIRECT_BASE_URL=https://r.yourdomain.com
- *
- * IMPORTANT: This worker forwards all request headers including cf-ipcountry,
- * which the Supabase function uses for geo-routing. Do NOT strip headers.
+ * Supports:
+ *   GET  /CODE       → proxy to Supabase redirect function
+ *   GET  /r/CODE     → same, alternate path style
+ *   POST /CODE       → password-protected link submission (body forwarded)
+ *   POST /r/CODE     → same, alternate path style
  */
 
-// SUPABASE_REDIRECT_URL must be set as a Cloudflare Worker env var (wrangler secret / wrangler.toml [vars]).
-// Never hardcode the URL here — it exposes the Supabase project subdomain in version control.
+/**
+ * Extract the short code from the request pathname.
+ * Supports /CODE and /r/CODE path styles.
+ * @param {string} pathname
+ * @returns {string|null}
+ */
+export function extractShortCode(pathname) {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return null;
+
+  // /r/CODE → segments = ["r", "CODE"]
+  if (segments[0] === "r") {
+    return segments.length >= 2 ? segments[1] : null;
+  }
+  // /CODE → segments = ["CODE"]
+  if (segments.length === 1) {
+    return segments[0];
+  }
+  return null;
+}
+
+/**
+ * Build upstream headers preserving geo-routing and content-type info.
+ * Injects Supabase auth headers.
+ * @param {Headers} incoming
+ * @param {string} anonKey
+ * @returns {Headers}
+ */
+export function buildUpstreamHeaders(incoming, anonKey) {
+  const headers = new Headers();
+
+  // Preserve geo-routing and client info headers
+  const preserve = [
+    "cf-ipcountry",
+    "cf-connecting-ip",
+    "x-real-ip",
+    "x-forwarded-for",
+    "user-agent",
+    "referer",
+    "content-type",
+    "accept",
+  ];
+  for (const key of preserve) {
+    const val = incoming.get(key);
+    if (val) headers.set(key, val);
+  }
+
+  // Supabase auth
+  headers.set("apikey", anonKey);
+  headers.set("Authorization", `Bearer ${anonKey}`);
+
+  return headers;
+}
 
 export default {
   async fetch(request, env) {
-    const SUPABASE_REDIRECT_URL = env.SUPABASE_REDIRECT_URL;
+    const { SUPABASE_URL, SUPABASE_ANON_KEY } = env;
 
-    // Guard: fail fast if env var not configured — prevents silent undefined/CODE URLs
-    if (!SUPABASE_REDIRECT_URL) {
-      return new Response(JSON.stringify({ error: "SUPABASE_REDIRECT_URL not configured" }), {
-        status: 500,
+    // Guard: fail fast if secrets missing
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      const missing = [];
+      if (!SUPABASE_URL) missing.push("SUPABASE_URL");
+      if (!SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
+      return new Response(
+        JSON.stringify({ error: `Missing required secrets: ${missing.join(", ")}` }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
+
+    // Only GET and POST allowed
+    if (request.method !== "GET" && request.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
         headers: { "Content-Type": "application/json" },
       });
     }
 
     const url = new URL(request.url);
+    const shortCode = extractShortCode(url.pathname);
 
-    // Handle CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET",
-        },
+    if (!shortCode) {
+      return new Response(JSON.stringify({ error: "Short code required" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
       });
     }
 
-    // Extract short code from path — supports both /CODE and /r/CODE
-    const segments = url.pathname.split("/").filter(Boolean);
-    const shortCode = segments[segments.length - 1];
+    // Build upstream URL
+    const targetUrl = `${SUPABASE_URL}/functions/v1/redirect/${shortCode}`;
+    const headers = buildUpstreamHeaders(request.headers, SUPABASE_ANON_KEY);
 
-    if (!shortCode) {
-      return new Response("Not found", { status: 404 });
+    // Forward request, including body for POST (password-protected links)
+    const fetchOpts = {
+      method: request.method,
+      headers,
+      redirect: "manual",
+    };
+    if (request.method === "POST") {
+      fetchOpts.body = request.body;
     }
 
-    // Forward to Supabase, preserving original headers (cf-ipcountry, user-agent, etc.)
-    const targetUrl = `${SUPABASE_REDIRECT_URL}/${shortCode}`;
-    const response = await fetch(targetUrl, {
-      method: request.method,
-      headers: request.headers,
-      redirect: "manual", // let Supabase redirect pass through as-is
-    });
-
+    const response = await fetch(targetUrl, fetchOpts);
     return response;
   },
 };

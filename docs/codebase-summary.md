@@ -28,12 +28,12 @@
 |--------|-------|
 | **Total Files** | 150+ |
 | **Repo Tokens** | ~102K |
-| **Tests** | 289 passing unit/integration tests + Playwright E2E suite |
+| **Tests** | 308 passing unit/integration tests (289 app + 19 worker) + 30 Playwright E2E |
 | **Code Files** | ~60 (src/ + supabase/ + functions/) |
 | **Dependencies** | 46 prod + 25 dev |
 | **Build Time** | ~5s (clean, no warnings) |
 | **Bundle Size** | 147KB gzipped (main), StatsPanel/StatsCharts lazy-loaded |
-| **Last Updated** | 2026-03-17 (QR persistence, exports, Sentry, bulk ops, Playwright) |
+| **Last Updated** | 2026-03-17 (worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
 
 ---
 
@@ -58,7 +58,7 @@ qrlive/
 │   │   ├── types.ts           # TypeScript types
 │   │   └── query-keys.ts      # React Query keys
 │   ├── integrations/supabase/ # Supabase client & types
-│   ├── test/                  # 289 unit/integration tests (20 files)
+│   ├── test/                  # 289 unit/integration tests (20 files, app project)
 │   ├── App.tsx                # Root component + routing (code-split)
 │   ├── main.tsx               # Entry point
 │   └── index.css              # Tailwind + global styles
@@ -71,6 +71,10 @@ qrlive/
 │   └── migrations/            # 11 database migrations
 │
 ├── cloudflare-worker/           # ✅ Canonical redirect-domain gateway (r.yourdomain.com → Supabase edge)
+│   ├── redirect-proxy.js        # Worker handler (extractShortCode, buildUpstreamHeaders, fetch)
+│   ├── redirect-proxy.test.js   # 19 Vitest tests (proxy contract, errors)
+│   ├── wrangler.toml            # Wrangler deployment config
+│   └── README.md                # Setup, secrets, deploy instructions
 ├── proxy-gateway/               # ✅ Canonical bypass gateway for bypass_url (Fly.io Tokyo)
 ├── public/                    # Static assets (favicon, robots.txt)
 ├── .claude/                   # Development context files
@@ -78,7 +82,7 @@ qrlive/
 ├── docs/                      # Documentation (this folder)
 ├── package.json               # Dependencies & scripts
 ├── vite.config.ts             # Vite build config
-├── vitest.config.ts           # Test config
+├── vitest.config.ts           # Test config (test.projects: app + cloudflare-worker)
 ├── tailwind.config.ts         # Tailwind CSS
 ├── tsconfig.json              # TypeScript
 ├── .env.example               # Environment template
@@ -310,9 +314,11 @@ E2E_TEST_PASSWORD=[seeded-test-user-password]
 
 ---
 
-## Testing (289 unit/integration tests + Playwright E2E suite)
+## Testing (308 unit/integration tests + 30 Playwright E2E)
 
 ### High-Level Breakdown
+
+**App project (289 tests, jsdom):**
 - **Schemas & Validation** (17 tests) — auth, links, geo-routes, URL validation
 - **Database & Data Layer** (57 tests) — db utils, mutations, query helpers, query keys
 - **Auth Context** (8 tests) — session lifecycle, sign in/up/out, normalized errors
@@ -323,13 +329,20 @@ E2E_TEST_PASSWORD=[seeded-test-user-password]
 - **Redirect Handler (real logic)** (13 tests) — direct tests against `redirect-handler.ts`
 - **App Smoke** (1 test) — Vitest wiring
 
-### Playwright E2E Coverage
+**Cloudflare Worker project (19 tests, node):**
+- **extractShortCode** (5 tests) — `/CODE`, `/r/CODE`, edge cases
+- **buildUpstreamHeaders** (4 tests) — auth injection, geo-routing preservation, header filtering
+- **Proxy forwarding contract** (6 tests) — upstream URL, auth headers, POST body, redirect:manual
+- **Error handling** (4 tests) — missing secrets, empty code, CORS, unsupported methods
+
+### Playwright E2E Coverage (30 passed, 0 skipped)
 - `e2e/auth.spec.ts` — unauthenticated redirect plus credentialed login/session flows
 - `e2e/link-crud.spec.ts` — create, edit, toggle active, delete
 - `e2e/qr-customization.spec.ts` — QR preset change + PNG/SVG downloads
 - `e2e/analytics.spec.ts` — stats view, range toggles, country filter, CSV export, back navigation
 - `e2e/bulk-operations.spec.ts` — CSV export, import dialog, preview, validation errors
 - `e2e/redirect.spec.ts` — live redirect endpoint smoke checks
+- `e2e/dashboard.spec.ts` — credential-gated dashboard flows with Vietnamese UI selectors
 
 Auth-gated specs read `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` from `.env.local` or shell env. Without them, those specs skip cleanly instead of failing on Supabase email-rate limits.
 
@@ -353,10 +366,17 @@ Auth-gated specs read `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` from `.env.local`
 - Header forwarding + redirect rewriting
 - Config validation + proxy agent selection
 
+### Vitest Projects
+
+`vitest.config.ts` uses `test.projects` to run two test environments under a single `npm test`:
+- **app** — jsdom, React plugin, `src/test/setup.ts`, includes `src/**/*.test.*`
+- **cloudflare-worker** — node, no setupFiles, includes `cloudflare-worker/**/*.test.*`
+
 **Run Tests**:
 ```bash
-npm run test          # Run once
+npm run test          # Run all 308 tests (app + worker)
 npm run gateway:test  # Run proxy-gateway smoke tests
+npm run test:e2e      # Playwright E2E (30 tests)
 npm run test:watch   # Watch mode
 ```
 
@@ -424,6 +444,10 @@ supabase functions deploy redirect --no-verify-jwt
 | **src/components/StatsPanel.tsx** | Analytics visualization |
 | **playwright.config.ts** | Playwright config, Chromium project, `webServer` bootstrap [NEW 2026-03-17] |
 | **e2e/** | Playwright E2E specs + shared helper layer [NEW 2026-03-17] |
+| **cloudflare-worker/redirect-proxy.js** | Worker handler: extractShortCode, buildUpstreamHeaders, fetch proxy [REWRITTEN 2026-03-17] |
+| **cloudflare-worker/redirect-proxy.test.js** | 19 Vitest tests: proxy contract, headers, errors [NEW 2026-03-17] |
+| **cloudflare-worker/wrangler.toml** | Wrangler deployment config (secrets: SUPABASE_URL, SUPABASE_ANON_KEY) |
+| **cloudflare-worker/README.md** | Worker setup, secrets, deploy, test instructions [NEW 2026-03-17] |
 | **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (SupabaseAdapter interface) [NEW 2026-03-16] |
 | **supabase/functions/redirect/index.ts** | Thin Deno wrapper for redirect handler |
 
@@ -616,6 +640,6 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-17 (QR persistence, Sentry, analytics export, bulk ops, Playwright)
+**Last Updated**: 2026-03-17 (worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
 **Next Review**: 2026-04-16
-**Version**: v1.4 | **Tests**: 289/289 unit+integration passing | **Status**: Production-ready
+**Version**: v1.5 | **Tests**: 308/308 unit+integration passing (289 app + 19 worker) + 30 E2E | **Status**: Production-ready
