@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:deployed": "playwright test e2e/integration-create-redirect-analytics.spec.ts --reporter=line",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

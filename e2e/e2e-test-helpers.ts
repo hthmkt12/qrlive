@@ -182,3 +182,10 @@ export async function seedAnalyticsFromLinkCard(
   await page.waitForTimeout(1_500);
   return response;
 }
+
+export async function deleteLink(page: Page, name: string) {
+  const card = getLinkCard(page, name);
+  await card.getByRole("button", { name: "Xóa link" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Xóa" }).click();
+  await expect(card).toBeHidden({ timeout: 10_000 });
+}
