@@ -2,7 +2,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword } from "@/lib/password-utils";
-import type { QRLinkRow } from "./models";
+import type { QRLinkRow, QrConfig } from "./models";
 
 /** Generate a 6-char alphanumeric short code, retrying up to 5 times on collision */
 export async function generateShortCode(): Promise<string> {
@@ -26,7 +26,8 @@ export async function createLinkInDB(
   userId: string,
   customShortCode?: string,
   expiresAt?: string | null,
-  password?: string
+  password?: string,
+  qrConfig?: QrConfig | null
 ): Promise<QRLinkRow> {
   let shortCode: string;
 
@@ -64,6 +65,7 @@ export async function createLinkInDB(
       expires_at: expiresAt || null,
       password_hash: passwordHash,
       password_salt: null,
+      qr_config: qrConfig ?? null,
     })
     .select()
     .single();
@@ -97,7 +99,7 @@ export async function createLinkInDB(
 
 export async function updateLinkInDB(
   id: string,
-  updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null },
+  updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null; qr_config?: QrConfig | null },
   password?: string // undefined = no change; "" = clear password; non-empty = set new password
 ) {
   // Build password fields based on the password param

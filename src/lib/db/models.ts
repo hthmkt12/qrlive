@@ -1,5 +1,14 @@
 // Data model interfaces for QR link system
 
+/** QR code visual configuration — persisted as JSONB in qr_links.qr_config */
+export interface QrConfig {
+  fgColor: string;
+  bgColor: string;
+  logoUrl?: string;
+  borderStyle?: string;
+  errorLevel?: "L" | "M" | "Q" | "H";
+}
+
 export interface QRLinkRow {
   id: string;
   user_id: string;
@@ -12,6 +21,8 @@ export interface QRLinkRow {
   geo_routes: GeoRouteRow[];
   // Server-side generated column: true when password_hash IS NOT NULL
   has_password: boolean;
+  // Nullable JSONB — null means use QRPreview defaults
+  qr_config: QrConfig | null;
 }
 
 export interface GeoRouteRow {

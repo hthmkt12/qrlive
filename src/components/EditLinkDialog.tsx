@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -9,6 +9,7 @@ import { Plus, Globe, Trash2, Save, Lock } from "lucide-react";
 import { COUNTRIES } from "@/lib/types";
 import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
 import { QRLinkRow } from "@/lib/db";
+import type { QrConfig } from "@/lib/db/models";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateLink, useUpdateGeoRoutes } from "@/hooks/use-link-mutations";
 
@@ -22,6 +23,8 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
   const { toast } = useToast();
   const updateLink = useUpdateLink();
   const updateGeoRoutes = useUpdateGeoRoutes();
+  // Track QR config changes from QRPreview; initialized from link.qr_config when link changes
+  const qrConfigRef = useRef<QrConfig | null>(null);
 
   const {
     register,
@@ -55,6 +58,8 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
           bypassUrl: r.bypass_url || "",
         })),
       });
+      // Initialize QR config ref from saved link config
+      qrConfigRef.current = link.qr_config ?? null;
     }
   }, [link, reset]);
 
@@ -73,7 +78,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
       // Note: empty string is intentional — it signals "clear the password"
       await updateLink.mutateAsync({
         id: link.id,
-        updates: { name: data.name, default_url: data.defaultUrl, expires_at },
+        updates: { name: data.name, default_url: data.defaultUrl, expires_at, qr_config: qrConfigRef.current },
         password: data.linkPassword,
       });
       await updateGeoRoutes.mutateAsync({

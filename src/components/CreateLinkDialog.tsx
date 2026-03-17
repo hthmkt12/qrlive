@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -11,12 +11,15 @@ import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { useCreateLink } from "@/hooks/use-link-mutations";
+import type { QrConfig } from "@/lib/db/models";
 
 export function CreateLinkDialog() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const createLink = useCreateLink();
+  // Track latest QR config from the QRPreview component (if rendered in a future step)
+  const qrConfigRef = useRef<QrConfig | null>(null);
 
   const {
     register,
@@ -59,6 +62,7 @@ export function CreateLinkDialog() {
         customShortCode: data.customShortCode || undefined,
         expiresAt,
         password: data.linkPassword || undefined,
+        qrConfig: qrConfigRef.current,
       });
       reset();
       setOpen(false);
@@ -76,7 +80,10 @@ export function CreateLinkDialog() {
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
-    if (!next) reset();
+    if (!next) {
+      reset();
+      qrConfigRef.current = null;
+    }
   };
 
   return (

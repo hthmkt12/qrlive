@@ -8,6 +8,7 @@ export type {
   LinkAnalyticsCountryRow,
   LinkAnalyticsRefererRow,
   LinkAnalyticsDetailRow,
+  QrConfig,
 } from "./db/models";
 
 export {
