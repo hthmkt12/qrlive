@@ -15,6 +15,7 @@ All significant changes, features, and fixes documented here.
 
 ### Fixed
 - Hardened click webhooks by rejecting localhost, IP-literal, and non-public hostnames before the redirect edge function issues outbound fetches
+- Tightened webhook security further by requiring HTTPS, redacting webhook URLs in delivery logs, and rejecting hostnames whose DNS resolves to private or reserved IP space
 - Completed Redis cache invalidation preflight headers so browser-triggered purge requests do not silently fail on CORS
 - Closed the remaining CSV formula-injection gap for values prefixed by spaces or line breaks, and made bulk CSV parsing count quoted multiline rows correctly
 - Clarified analytics country filtering so the selector scopes referer breakdown/export metadata without mixing filtered and global dashboard totals

@@ -154,10 +154,10 @@ describe("CreateLinkDialog", () => {
 
     await openDialog(user);
     await fillBaseForm(user);
-    await user.type(screen.getByPlaceholderText(/webhooks\/qrlive/i), "ftp://hooks.example.com/qrlive");
+    await user.type(screen.getByPlaceholderText(/webhooks\/qrlive/i), "http://hooks.example.com/qrlive");
     await user.click(screen.getByRole("button", { name: /Tạo link & QR Code/i }));
 
-    expect(await screen.findByText(/Webhook URL phải bắt đầu bằng http:\/\/ hoặc https:\/\//i)).toBeInTheDocument();
+    expect(await screen.findByText(/Webhook URL phải bắt đầu bằng https:\/\//i)).toBeInTheDocument();
   });
 
   it("shows a destructive toast for SHORT_CODE_TAKEN", async () => {

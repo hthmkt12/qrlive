@@ -164,6 +164,7 @@ describe("redirect-handler (real logic)", () => {
   it("records click and queues webhook for non-bot traffic", async () => {
     const queued: Promise<void>[] = [];
     const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+    const resolveDnsImpl = vi.fn().mockResolvedValue(["93.184.216.34"]);
     const adapter = makeAdapter({
       fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "https://hooks.example.com/clicks" })),
       recentClickCount: vi.fn().mockResolvedValue(0),
@@ -173,6 +174,7 @@ describe("redirect-handler (real logic)", () => {
     const res = await handleRedirect(makeReq(), adapter, {
       fetchImpl,
       queueBackgroundTask: (task) => queued.push(task),
+      resolveDnsImpl,
     });
 
     expect(res.status).toBe(302);
@@ -221,6 +223,7 @@ describe("redirect-handler (real logic)", () => {
   it("does not fail redirects when webhook delivery errors", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const queued: Promise<void>[] = [];
+    const resolveDnsImpl = vi.fn().mockResolvedValue(["93.184.216.34"]);
     const res = await handleRedirect(
       makeReq(),
       makeAdapter({
@@ -229,28 +232,33 @@ describe("redirect-handler (real logic)", () => {
       {
         fetchImpl: vi.fn().mockRejectedValue(new Error("network down")),
         queueBackgroundTask: (task) => queued.push(task),
+        resolveDnsImpl,
       }
     );
 
     expect(res.status).toBe(302);
     await Promise.all(queued);
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("Click webhook delivery failed for https://hooks.example.com/fail")
+      expect.stringContaining("Click webhook delivery failed for https://hooks.example.com/...")
     );
   });
 
-  it("does not fetch blocked webhook targets and still completes the redirect", async () => {
+  it("does not fetch webhooks whose DNS resolves to private IPs and still completes the redirect", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const queued: Promise<void>[] = [];
     const fetchImpl = vi.fn();
+    const resolveDnsImpl = vi.fn().mockImplementation(async (_hostname: string, recordType: "A" | "AAAA") => (
+      recordType === "A" ? ["10.0.0.5"] : []
+    ));
     const res = await handleRedirect(
       makeReq(),
       makeAdapter({
-        fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "http://127.0.0.1:8080/hook" })),
+        fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "https://hooks.example.com/private" })),
       }),
       {
         fetchImpl,
         queueBackgroundTask: (task) => queued.push(task),
+        resolveDnsImpl,
       }
     );
 
@@ -258,7 +266,7 @@ describe("redirect-handler (real logic)", () => {
     await Promise.all(queued);
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining("Click webhook delivery failed for http://127.0.0.1:8080/hook")
+      expect.stringContaining("Click webhook delivery failed for https://hooks.example.com/...")
     );
   });
 });

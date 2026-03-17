@@ -68,18 +68,21 @@ describe("linkFormSchema", () => {
     expect(linkFormSchema.safeParse({ ...valid, webhookUrl: "https://hooks.example.com/qrlive" }).success).toBe(true);
   });
 
-  it("rejects webhook URLs without http or https", () => {
-    const result = linkFormSchema.safeParse({ ...valid, webhookUrl: "ftp://hooks.example.com/qrlive" });
+  it("rejects webhook URLs without https", () => {
+    const result = linkFormSchema.safeParse({ ...valid, webhookUrl: "http://hooks.example.com/qrlive" });
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0].message).toBe("Webhook URL phải bắt đầu bằng http:// hoặc https://");
+    expect(result.error?.issues[0].message).toBe("Webhook URL phải bắt đầu bằng https://");
   });
 
-  it("rejects localhost and IP-based webhook URLs", () => {
+  it("rejects localhost, IP-based, and local-rebinding webhook URLs", () => {
     const localhost = linkFormSchema.safeParse({ ...valid, webhookUrl: "https://localhost:3000/hook" });
-    const ipLiteral = linkFormSchema.safeParse({ ...valid, webhookUrl: "http://127.0.0.1:8080/hook" });
+    const ipLiteral = linkFormSchema.safeParse({ ...valid, webhookUrl: "https://127.0.0.1:8080/hook" });
+    const rebinding = linkFormSchema.safeParse({ ...valid, webhookUrl: "https://10.0.0.1.sslip.io/hook" });
     expect(localhost.success).toBe(false);
     expect(ipLiteral.success).toBe(false);
-    expect(localhost.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng domain public, không dùng localhost hoặc địa chỉ IP");
-    expect(ipLiteral.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng domain public, không dùng localhost hoặc địa chỉ IP");
+    expect(rebinding.success).toBe(false);
+    expect(localhost.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng HTTPS với domain public, không dùng localhost, IP, hoặc domain nội bộ");
+    expect(ipLiteral.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng HTTPS với domain public, không dùng localhost, IP, hoặc domain nội bộ");
+    expect(rebinding.error?.issues.at(-1)?.message).toBe("Webhook URL phải dùng HTTPS với domain public, không dùng localhost, IP, hoặc domain nội bộ");
   });
 });

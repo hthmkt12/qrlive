@@ -1,7 +1,18 @@
 import { z } from "zod";
 
 const BLOCKED_WEBHOOK_HOSTS = new Set(["localhost"]);
-const BLOCKED_WEBHOOK_SUFFIXES = [".internal", ".lan", ".local", ".localhost", ".home"];
+const BLOCKED_WEBHOOK_SUFFIXES = [
+  ".internal",
+  ".lan",
+  ".local",
+  ".localhost",
+  ".home",
+  ".localtest.me",
+  ".lvh.me",
+  ".nip.io",
+  ".sslip.io",
+  ".xip.io",
+];
 
 function normalizeWebhookHostname(hostname: string) {
   return hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
@@ -22,6 +33,7 @@ function isSafeWebhookUrl(value: string) {
   }
 
   const hostname = normalizeWebhookHostname(target.hostname);
+  if (target.protocol !== "https:") return false;
   if (!hostname || !hostname.includes(".")) return false;
   if (BLOCKED_WEBHOOK_HOSTS.has(hostname)) return false;
   if (BLOCKED_WEBHOOK_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) return false;
@@ -35,12 +47,12 @@ const webhookUrlSchema = z.preprocess(
     z.string()
       .url("Webhook URL không hợp lệ")
       .refine(
-        (value) => /^https?:\/\//i.test(value),
-        "Webhook URL phải bắt đầu bằng http:// hoặc https://"
+        (value) => /^https:\/\//i.test(value),
+        "Webhook URL phải bắt đầu bằng https://"
       )
       .refine(
         (value) => isSafeWebhookUrl(value),
-        "Webhook URL phải dùng domain public, không dùng localhost hoặc địa chỉ IP"
+        "Webhook URL phải dùng HTTPS với domain public, không dùng localhost, IP, hoặc domain nội bộ"
       ),
   ])
 );

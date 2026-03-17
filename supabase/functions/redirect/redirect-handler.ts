@@ -1,4 +1,9 @@
-import { buildClickWebhookPayload, dispatchClickWebhook, reportClickWebhookError } from "./click-webhook.ts";
+import {
+  buildClickWebhookPayload,
+  dispatchClickWebhook,
+  reportClickWebhookError,
+  type ResolveDnsFn,
+} from "./click-webhook.ts";
 import { buildPasswordForm, hashPasswordPBKDF2, isLegacyHash, verifyPassword } from "./redirect-password.ts";
 
 export { buildPasswordForm, hashPasswordPBKDF2, isLegacyHash, verifyPassword };
@@ -33,7 +38,11 @@ export interface ClickEvent {
 }
 export interface HandlerRequest { method: string; url: string; headers: Record<string, string>; formData?: Record<string, string>; }
 export interface HandlerResponse { status: number; headers: Record<string, string>; body: string; }
-export interface RedirectRuntimeOptions { fetchImpl?: typeof fetch; queueBackgroundTask?: (task: Promise<void>) => void; }
+export interface RedirectRuntimeOptions {
+  fetchImpl?: typeof fetch;
+  queueBackgroundTask?: (task: Promise<void>) => void;
+  resolveDnsImpl?: ResolveDnsFn;
+}
 
 export const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -76,7 +85,8 @@ function queueWebhook(link: LinkRecord, countryCode: string, referer: string, re
       referer,
       shortCode: link.short_code,
     }),
-    options.fetchImpl
+    options.fetchImpl,
+    options.resolveDnsImpl
   ).catch((error) => reportClickWebhookError(link.webhook_url!, error));
 
   if (options.queueBackgroundTask) {

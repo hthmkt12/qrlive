@@ -1,6 +1,13 @@
+import {
+  assertWebhookUrlResolvesPublicIp,
+  redactWebhookUrl,
+  type ResolveDnsFn,
+  validateWebhookUrl,
+} from "./webhook-url-security.ts";
+
+export { redactWebhookUrl, type ResolveDnsFn, validateWebhookUrl } from "./webhook-url-security.ts";
+
 const WEBHOOK_TIMEOUT_MS = 3_000;
-const BLOCKED_WEBHOOK_HOSTS = new Set(["localhost"]);
-const BLOCKED_WEBHOOK_SUFFIXES = [".internal", ".lan", ".local", ".localhost", ".home"];
 
 export interface ClickWebhookPayload {
   event: "click.created";
@@ -31,39 +38,6 @@ interface BuildClickWebhookPayloadInput {
   redirectUrl: string;
   referer: string;
   shortCode: string;
-}
-
-function normalizeHostname(hostname: string) {
-  return hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
-}
-
-function isIPv4Literal(hostname: string) {
-  const octets = hostname.split(".");
-  if (octets.length !== 4) return false;
-  return octets.every((octet) => /^\d+$/.test(octet) && Number(octet) >= 0 && Number(octet) <= 255);
-}
-
-function isBlockedWebhookHostname(hostname: string) {
-  const normalized = normalizeHostname(hostname);
-  if (!normalized) return true;
-  if (BLOCKED_WEBHOOK_HOSTS.has(normalized)) return true;
-  if (BLOCKED_WEBHOOK_SUFFIXES.some((suffix) => normalized.endsWith(suffix))) return true;
-  if (!normalized.includes(".")) return true;
-  return isIPv4Literal(normalized) || normalized.includes(":");
-}
-
-export function validateWebhookUrl(rawUrl: string) {
-  let target: URL;
-  try {
-    target = new URL(rawUrl);
-  } catch {
-    throw new Error("WEBHOOK_URL_INVALID");
-  }
-
-  if (!/^https?:$/.test(target.protocol)) throw new Error("WEBHOOK_URL_INVALID");
-  if (target.username || target.password) throw new Error("WEBHOOK_URL_INVALID");
-  if (isBlockedWebhookHostname(target.hostname)) throw new Error("WEBHOOK_URL_BLOCKED");
-  return target;
 }
 
 export function buildClickWebhookPayload({
@@ -100,9 +74,11 @@ export function buildClickWebhookPayload({
 export async function dispatchClickWebhook(
   url: string,
   payload: ClickWebhookPayload,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  resolveDnsImpl?: ResolveDnsFn
 ) {
   const target = validateWebhookUrl(url);
+  await assertWebhookUrlResolvesPublicIp(target, resolveDnsImpl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
@@ -128,5 +104,5 @@ export async function dispatchClickWebhook(
 
 export function reportClickWebhookError(url: string, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`Click webhook delivery failed for ${url}: ${message}`);
+  console.error(`Click webhook delivery failed for ${redactWebhookUrl(url)}: ${message}`);
 }
