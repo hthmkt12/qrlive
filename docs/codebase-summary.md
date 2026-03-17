@@ -1,6 +1,6 @@
 # QRLive Codebase Summary
 
-**Quick reference guide for developers and LLMs** | Generated from repomix 2026-03-16
+**Quick reference guide for developers and LLMs** | Updated 2026-03-17
 
 ---
 
@@ -10,6 +10,9 @@
 - Geo-routing to 15 countries
 - Bypass URLs for geo-blocking
 - Real-time click analytics
+- QR customization persistence
+- Sentry error tracking
+- Bulk CSV import/export
 - Supabase backend + edge functions
 - Vietnamese UI with dark/light themes
 
@@ -25,12 +28,12 @@
 |--------|-------|
 | **Total Files** | 150+ |
 | **Repo Tokens** | ~102K |
-| **Tests** | 289 passing (20 files) |
+| **Tests** | 289 passing unit/integration tests + Playwright E2E suite |
 | **Code Files** | ~60 (src/ + supabase/ + functions/) |
 | **Dependencies** | 46 prod + 25 dev |
 | **Build Time** | ~5s (clean, no warnings) |
 | **Bundle Size** | 147KB gzipped (main), StatsPanel/StatsCharts lazy-loaded |
-| **Last Updated** | 2026-03-16 (redirect handler extraction, direct handler tests) |
+| **Last Updated** | 2026-03-17 (QR persistence, exports, Sentry, bulk ops, Playwright) |
 
 ---
 
@@ -86,6 +89,26 @@ Additional service: `proxy-gateway/` contains the always-on bypass gateway for H
 
 ---
 
+## Recent Additions (2026-03-17)
+
+### New Library Modules
+- **src/lib/sentry-config.ts** — Initializes `@sentry/react`, Browser Tracing, Replay sampling, and exports the shared error boundary
+- **src/lib/analytics-export-utils.ts** — Generates analytics CSV payloads and triggers CSV/PDF export flows
+- **src/lib/bulk-operations-utils.ts** — Parses CSV files, validates rows, groups geo routes, and generates dashboard CSV exports
+- **src/lib/bulk-operations-schemas.ts** — Zod schemas + grouped-link types for bulk CSV import/export
+
+### New UI Components
+- **src/components/analytics-export-button.tsx** — Export dropdown used inside StatsPanel
+- **src/components/bulk-import-dialog.tsx** — Drag-drop CSV import flow with preview/progress states
+- **src/components/bulk-import-preview-table.tsx** — Scrollable row-by-row validation preview for imports
+- **src/components/bulk-export-button.tsx** — Dashboard-level CSV export button for all links
+
+### New E2E Surface
+- **e2e/** — Playwright specs for auth, link CRUD, QR customization, analytics, and bulk operations, plus shared helpers
+- **playwright.config.ts** — Chromium-only Playwright config with `webServer` booting Vite on port `5173`
+
+---
+
 ## Core Components
 
 ### Pages (src/pages/)
@@ -100,6 +123,10 @@ Additional service: `proxy-gateway/` contains the always-on bypass gateway for H
 - **StatsPanel.tsx** — Analytics: 7-day chart, country pie, referer list
 - **QRPreview.tsx** — Renders QR code for short URL
 - **analytics-date-range-picker.tsx** — Date range selector for analytics queries [NEW 2026-03-16]
+- **analytics-export-button.tsx** — Dropdown trigger for CSV/PDF analytics export [NEW 2026-03-17]
+- **bulk-import-dialog.tsx** — CSV upload/import modal with drag-drop, preview, progress [NEW 2026-03-17]
+- **bulk-import-preview-table.tsx** — Validation preview table for uploaded CSV rows [NEW 2026-03-17]
+- **bulk-export-button.tsx** — One-click CSV export for dashboard links [NEW 2026-03-17]
 
 ### UI Components (src/components/ui/)
 45 shadcn/ui (Radix UI) components:
@@ -275,9 +302,15 @@ VITE_SUPABASE_PUBLISHABLE_KEY=[anon-key]
 SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 ```
 
+### Optional for credentialed E2E dashboard flows
+```
+E2E_TEST_EMAIL=[seeded-test-user-email]
+E2E_TEST_PASSWORD=[seeded-test-user-password]
+```
+
 ---
 
-## Testing (289 tests total)
+## Testing (289 unit/integration tests + Playwright E2E suite)
 
 ### High-Level Breakdown
 - **Schemas & Validation** (17 tests) — auth, links, geo-routes, URL validation
@@ -289,6 +322,16 @@ SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 - **Redirect Integration (simulator)** (42 tests) — password, expiration, geo-routing, redirect flow behavior
 - **Redirect Handler (real logic)** (13 tests) — direct tests against `redirect-handler.ts`
 - **App Smoke** (1 test) — Vitest wiring
+
+### Playwright E2E Coverage
+- `e2e/auth.spec.ts` — unauthenticated redirect plus credentialed login/session flows
+- `e2e/link-crud.spec.ts` — create, edit, toggle active, delete
+- `e2e/qr-customization.spec.ts` — QR preset change + PNG/SVG downloads
+- `e2e/analytics.spec.ts` — stats view, range toggles, country filter, CSV export, back navigation
+- `e2e/bulk-operations.spec.ts` — CSV export, import dialog, preview, validation errors
+- `e2e/redirect.spec.ts` — live redirect endpoint smoke checks
+
+Auth-gated specs read `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` from `.env.local` or shell env. Without them, those specs skip cleanly instead of failing on Supabase email-rate limits.
 
 ### Direct Redirect Handler Coverage
 - OPTIONS preflight → 200 + CORS
@@ -324,9 +367,10 @@ npm run test:watch   # Watch mode
 ### Development
 ```bash
 npm install
-npm run dev           # Vite dev server (http://localhost:5173)
+npm run dev           # Vite dev server (default: http://localhost:8080)
 npm run typecheck    # TypeScript check
 npm run lint         # ESLint
+npm run test:e2e     # Playwright E2E (boots Vite on http://127.0.0.1:5173)
 ```
 
 ### Production
@@ -359,6 +403,10 @@ supabase functions deploy redirect --no-verify-jwt
 | **src/lib/db/models.ts** | Type definitions for queries/mutations |
 | **src/lib/db/utils.ts** | Database utilities (code generation, validation) |
 | **src/lib/password-utils.ts** | PBKDF2-HMAC-SHA256 hashing, constant-time verify, legacy SHA-256 compat [UPDATED 2026-03-16] |
+| **src/lib/sentry-config.ts** | Sentry init, tracing/replay integration, shared error boundary [NEW 2026-03-17] |
+| **src/lib/analytics-export-utils.ts** | CSV/PDF analytics export helpers [NEW 2026-03-17] |
+| **src/lib/bulk-operations-utils.ts** | CSV parse/export helpers for bulk import/export [NEW 2026-03-17] |
+| **src/lib/bulk-operations-schemas.ts** | Zod schemas + grouped-link types for CSV workflows [NEW 2026-03-17] |
 | **src/lib/schemas.ts** | Zod validation schemas (centralized) |
 | **src/lib/types.ts** | COUNTRIES list, TypeScript types |
 | **src/contexts/auth-context.tsx** | Auth state + methods (useAuth hook) |
@@ -369,7 +417,13 @@ supabase functions deploy redirect --no-verify-jwt
 | **src/components/CreateLinkDialog.tsx** | Create form modal |
 | **src/components/EditLinkDialog.tsx** | Edit form modal (expiration, password) |
 | **src/components/analytics-date-range-picker.tsx** | Date range selector [NEW 2026-03-16] |
+| **src/components/analytics-export-button.tsx** | CSV/PDF export dropdown trigger [NEW 2026-03-17] |
+| **src/components/bulk-import-dialog.tsx** | CSV import modal with drag-drop + progress [NEW 2026-03-17] |
+| **src/components/bulk-import-preview-table.tsx** | Validation preview table for imported CSV rows [NEW 2026-03-17] |
+| **src/components/bulk-export-button.tsx** | Dashboard-level CSV export trigger [NEW 2026-03-17] |
 | **src/components/StatsPanel.tsx** | Analytics visualization |
+| **playwright.config.ts** | Playwright config, Chromium project, `webServer` bootstrap [NEW 2026-03-17] |
+| **e2e/** | Playwright E2E specs + shared helper layer [NEW 2026-03-17] |
 | **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (SupabaseAdapter interface) [NEW 2026-03-16] |
 | **supabase/functions/redirect/index.ts** | Thin Deno wrapper for redirect handler |
 
@@ -496,6 +550,8 @@ npm run lint            # Lint code
 
 # Testing
 npm run test            # Run tests once
+npm run test:e2e        # Run Playwright E2E suite
+npm run test:e2e:ui     # Open Playwright UI mode
 npm run gateway:test    # Run proxy-gateway smoke tests
 npm run test:watch     # Watch mode
 
@@ -560,6 +616,6 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-16 (redirect handler extraction, 289 tests, code-split build)
+**Last Updated**: 2026-03-17 (QR persistence, Sentry, analytics export, bulk ops, Playwright)
 **Next Review**: 2026-04-16
-**Version**: v1.3 | **Tests**: 289/289 passing | **Status**: Production-ready
+**Version**: v1.4 | **Tests**: 289/289 unit+integration passing | **Status**: Production-ready

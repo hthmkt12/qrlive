@@ -39,10 +39,18 @@ src/
 │   ├── auth-context.test.tsx # Auth context state (8 tests)
 │   ├── example.test.ts     # Example test
 │   └── setup.ts            # Vitest config
+├── e2e/                    # Playwright E2E specs + helpers
+│   ├── e2e-test-helpers.ts # Auth/env helpers and dashboard actions
+│   ├── auth.spec.ts        # Auth redirect + credentialed session flows
+│   ├── link-crud.spec.ts   # Create/edit/toggle/delete coverage
+│   ├── qr-customization.spec.ts # QR preset + download coverage
+│   ├── analytics.spec.ts   # Range filter, country filter, export coverage
+│   └── bulk-operations.spec.ts # CSV import/export coverage
 ├── App.tsx                 # Root component + routing
 ├── main.tsx                # Entry point
 ├── App.css                 # Global styles
-└── index.css              # Tailwind + base CSS
+├── index.css               # Tailwind + base CSS
+└── playwright.config.ts    # Playwright config + dev server boot
 ```
 
 ---
@@ -478,6 +486,52 @@ describe("AuthProvider", () => {
 });
 ```
 
+### Playwright E2E Conventions
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { authenticate, hasPresetCredentials } from "./e2e-test-helpers";
+
+test.describe("Credentialed dashboard flows", () => {
+  test.skip(
+    !hasPresetCredentials,
+    "Set E2E_TEST_EMAIL and E2E_TEST_PASSWORD in .env.local or shell env.",
+  );
+
+  test("opens the dashboard", async ({ page }) => {
+    await authenticate(page, "dashboard");
+    await expect(page.getByRole("button", { name: "Tạo QR mới" })).toBeVisible();
+  });
+});
+```
+
+**Rules**
+- Keep one user-visible flow per spec file (`auth`, `link-crud`, `analytics`, `bulk-operations`)
+- Prefer accessible selectors first: `getByRole`, `getByLabel`, `getByPlaceholder`, `getByTitle`
+- Use unique link names per test run; do not depend on shared dashboard state
+- Read `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` from `.env.local` or shell env for auth-required flows
+- If credentials are missing, skip auth-gated specs with a clear reason; do not fake auth or bypass RLS
+- Let Playwright `webServer` boot Vite on `127.0.0.1:5173` even if local dev defaults differ
+- Use `page.waitForEvent("download")` for PNG/SVG/CSV assertions
+- Seed analytics with real redirect requests when the flow needs non-empty country/filter data
+
+### Bulk CSV File Format
+
+Required header order:
+
+```csv
+name,default_url,custom_short_code,expires_at,geo_country_code,geo_target_url,geo_bypass_url
+```
+
+**Rules**
+- `name` is required and non-empty
+- `default_url` must be a valid absolute URL
+- `custom_short_code`, `expires_at`, and all geo columns are optional
+- Multiple rows with the same `name + custom_short_code` are grouped into one link with multiple geo routes
+- `geo_country_code` and `geo_target_url` must be provided together to create a geo route
+- `geo_bypass_url` must be a valid URL when present
+- CSV import preview should show valid row count, row-level errors, and grouped import count before submit
+
 ---
 
 ## Error Handling
@@ -658,6 +712,12 @@ VITE_SUPABASE_URL=https://[project-id].supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=[key]
 ```
 
+### Optional for Playwright
+```
+E2E_TEST_EMAIL=[seeded-test-user-email]
+E2E_TEST_PASSWORD=[seeded-test-user-password]
+```
+
 ---
 
 ## Code Quality Guidelines
@@ -679,10 +739,10 @@ VITE_SUPABASE_PUBLISHABLE_KEY=[key]
 - No non-null assertions (except justified cases)
 
 ### Known Issues to Fix
-1. Add component test coverage for business components (StatsPanel, LinkCard, dialogs, QRPreview)
-2. Add automated coverage for redirect edge paths (proxy-gateway already has smoke tests)
+1. Provide seeded credentials in local/CI env for auth-gated Playwright dashboard flows
+2. Add deployed end-to-end edge-function verification beyond local Playwright coverage
 3. Add cached rollups or materialized summaries for higher-volume and longer-range analytics
-4. Split the main production bundle to reduce the Vite chunk-size warning
+4. Continue bundle trimming on the main production chunk when new UI/features land
 
 ---
 
@@ -699,6 +759,8 @@ npm run lint      # ESLint
 ### Testing
 ```bash
 npm run test      # Run all tests
+npm run test:e2e  # Run Playwright E2E suite
+npm run test:e2e:ui # Open Playwright UI mode
 npm run gateway:test # Run proxy-gateway smoke tests
 npm run test:watch # Watch mode
 ```

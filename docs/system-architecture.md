@@ -30,7 +30,7 @@
 │  │ Postgres Database (with RLS)                             │  │
 │  │ ├─ qr_links (owner-only SELECT/INSERT/UPDATE/DELETE)    │  │
 │  │ ├─ geo_routes (inherited RLS via link)                   │  │
-│  │ └─ click_events (public INSERT, owner-only SELECT)      │  │
+│  │ └─ click_events (service-role INSERT, owner-only SELECT)│  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
@@ -128,6 +128,75 @@ React Query refetch
 Dashboard updates immediately
 ```
 
+### 4. QR Config Persistence Flow
+
+```
+User customizes QR colors / border / logo / error level
+         ↓
+QRPreview emits onConfigChange(config)
+         ↓
+CreateLinkDialog / EditLinkDialog store config in qrConfigRef
+         ↓
+createLinkInDB() / updateLinkInDB()
+         ↓
+INSERT / UPDATE qr_links.qr_config (JSONB)
+         ↓
+fetchLinks() selects qr_config with each link row
+         ↓
+QR preview can rehydrate saved styling from persisted JSON
+```
+
+### 5. Analytics Export Pipeline
+
+```
+User opens StatsPanel
+         ↓
+AnalyticsExportButton
+  ├─ CSV path:
+  │    generateAnalyticsCSV()
+  │    → triggerCSVDownload()
+  │    → browser download
+  └─ PDF path:
+       triggerPrintExport()
+       → window.print()
+       → browser print / save-as-PDF dialog
+```
+
+### 6. Bulk CSV Import / Export Flow
+
+```
+Dashboard toolbar
+  ├─ BulkExportButton
+  │    → generateLinksCSV(links)
+  │    → downloadCSV()
+  │    → browser download
+  └─ BulkImportDialog
+       → drag-drop / file picker
+       → parseCSV()
+       → validateCSVRows()
+       → BulkImportPreviewTable
+       → groupRowsIntoLinks()
+       → useBulkCreateLinks()
+       → sequential createLinkInDB() + progress updates
+```
+
+### 7. Sentry Error Monitoring Flow
+
+```
+App bootstrap
+         ↓
+initSentry()
+  ├─ load DSN from VITE_SENTRY_DSN
+  ├─ browserTracingIntegration()
+  └─ replayIntegration()
+         ↓
+SentryErrorBoundary wraps <App />
+         ↓
+Unhandled React error
+         ↓
+Fallback UI renders + Sentry captures error / trace / replay
+```
+
 ---
 
 ## Database Schema
@@ -141,6 +210,11 @@ CREATE TABLE qr_links (
   short_code TEXT NOT NULL UNIQUE,  -- auto-generated 6-char or custom 3-20 chars
   default_url TEXT NOT NULL,
   is_active BOOLEAN DEFAULT true,
+  expires_at TIMESTAMP,
+  password_hash TEXT,
+  password_salt TEXT,
+  has_password BOOLEAN GENERATED ALWAYS AS (password_hash IS NOT NULL) STORED,
+  qr_config JSONB DEFAULT NULL,
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now()
 );
@@ -155,6 +229,8 @@ CREATE POLICY "owner_update" ON qr_links
 CREATE POLICY "owner_delete" ON qr_links
   FOR DELETE USING (auth.uid() = user_id);
 ```
+
+`qr_config` stores QR foreground/background colors, logo URL, border style, and error-correction level as JSONB.
 
 ### geo_routes
 ```sql
@@ -221,7 +297,7 @@ CREATE POLICY "owner_select" ON click_events
 
 - **qr_links**: Rows only visible/modifiable by owner (user_id = auth.uid())
 - **geo_routes**: Inherited access via qr_links CASCADE
-- **click_events**: Public INSERT (edge function uses service role), owner-only SELECT
+- **click_events**: Service-role INSERT only via edge function, owner-only SELECT
 
 **Edge Function Exception**: Uses `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS for:
 - Fetching qr_links by short_code (public lookup needed)
@@ -244,8 +320,12 @@ CREATE POLICY "owner_select" ON click_events
 | `LinkCard.tsx` | Display single link (name, short code, QR) + actions |
 | `CreateLinkDialog.tsx` | Modal form to create link with geo routes |
 | `EditLinkDialog.tsx` | Modal form to edit existing link |
-| `StatsPanel.tsx` | Analytics: bar chart (7-day), pie chart (countries), referer list |
+| `StatsPanel.tsx` | Analytics shell: range controls, country filter, export actions, QR preview |
 | `QRPreview.tsx` | Render QR code for short link |
+| `analytics-export-button.tsx` | CSV/PDF export dropdown for analytics detail |
+| `bulk-import-dialog.tsx` | CSV import dialog with preview/progress phases |
+| `bulk-import-preview-table.tsx` | Row-level validation preview for CSV import |
+| `bulk-export-button.tsx` | Dashboard-wide CSV export trigger |
 
 ### UI Components (shadcn/ui)
 45 Radix UI components wrapped with Tailwind CSS:
@@ -447,13 +527,18 @@ All responses include CORS headers for browser access.
 | Analytics summaries RPC | 2026-03-16 | Add get_link_click_summaries(uuid[]) aggregate function |
 | Analytics detail RPC | 2026-03-16 | Add get_link_click_detail(uuid) aggregate function |
 | Click events restrict | 2026-03-16 | Drop click_events_insert_public policy; service role only |
+| QR config persistence | 2026-03-17 | Add nullable `qr_config` JSONB column to `qr_links` |
 
 ---
 
 ## Monitoring & Debugging
 
-**No current monitoring** (nice-to-have):
-- Error tracking (Sentry)
+**Current monitoring**:
+- Sentry browser error tracking when `VITE_SENTRY_DSN` is configured
+- React error boundary fallback via `Sentry.ErrorBoundary`
+- Browser tracing + Replay sampling for production diagnostics
+
+**Still nice-to-have**:
 - Performance monitoring (Datadog)
 - Log aggregation (ELK stack)
 - Analytics dashboard (Metabase)
