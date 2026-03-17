@@ -2,6 +2,13 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { LinkAnalyticsDetailRow } from "@/lib/db";
 import { COUNTRIES } from "@/lib/types";
 
+/** Resolve a country code to display label, or null for "all" */
+function countryLabel(code: string): string | null {
+  if (code === "all") return null;
+  const c = COUNTRIES.find((c) => c.code === code);
+  return c ? `${c.flag} ${c.name}` : code;
+}
+
 const CHART_COLORS = [
   "hsl(174, 72%, 50%)",
   "hsl(174, 60%, 40%)",
@@ -18,10 +25,13 @@ export interface StatsChartsProps {
   chartTitle: string;
   analytics: LinkAnalyticsDetailRow;
   totalClicks: number;
+  selectedCountry?: string; // "all" or a country code — used for section heading
 }
 
 /** Recharts-heavy visualizations — bar chart, country pie, referer breakdown */
-export default function StatsCharts({ chartData, chartTitle, analytics, totalClicks }: StatsChartsProps) {
+export default function StatsCharts({ chartData, chartTitle, analytics, totalClicks, selectedCountry = "all" }: StatsChartsProps) {
+  const activeCountryLabel = countryLabel(selectedCountry);
+
   const countryData = analytics.country_breakdown.map((entry) => {
     const country = COUNTRIES.find((item) => item.code === entry.country_code);
     return { name: country ? `${country.flag} ${country.code}` : entry.country_code, value: entry.clicks };
@@ -84,7 +94,14 @@ export default function StatsCharts({ chartData, chartTitle, analytics, totalCli
         </div>
 
         <div className="rounded-xl border border-border bg-card p-4">
-          <h4 className="mb-4 text-sm font-semibold">Nguồn truy cập</h4>
+          <div className="mb-4 flex items-center gap-2">
+            <h4 className="text-sm font-semibold">Nguồn truy cập</h4>
+            {activeCountryLabel && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">
+                {activeCountryLabel}
+              </span>
+            )}
+          </div>
           {refererData.length > 0 ? (
             <div className="space-y-2">
               {refererData.map((entry, index) => (
