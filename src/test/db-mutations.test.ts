@@ -5,6 +5,10 @@ vi.mock("@/lib/password-utils", () => ({
   hashPassword: vi.fn().mockResolvedValue("pbkdf2:sha256:600000:bW9jay1zYWx0:bW9jay1oYXNo"),
 }));
 
+vi.mock("@/lib/link-cache-invalidation", () => ({
+  purgeLinkMetadataCacheQuietly: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock Supabase client
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -15,6 +19,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { supabase } from "@/integrations/supabase/client";
+import { purgeLinkMetadataCacheQuietly } from "@/lib/link-cache-invalidation";
 import { hashPassword } from "@/lib/password-utils";
 import {
   generateShortCode,
@@ -325,21 +330,29 @@ describe("createLinkInDB", () => {
 // ─── updateLinkInDB ─────────────────────────────────────────────────────────
 
 describe("updateLinkInDB", () => {
-  it("updates basic fields without password change", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
+  function mockUpdateChain(shortCode = "ABC123", error: unknown = null) {
+    const single = vi.fn().mockResolvedValue({ data: { short_code: shortCode }, error });
+    const select = vi.fn().mockReturnValue({ single });
+    const eq = vi.fn().mockReturnValue({ select });
     const update = vi.fn().mockReturnValue({ eq });
+    return { update, eq, select, single };
+  }
+
+  it("updates basic fields without password change", async () => {
+    const { update, eq, select } = mockUpdateChain();
     vi.mocked(supabase.from).mockReturnValue({ update } as never);
 
     await updateLinkInDB("link-1", { name: "Updated" });
 
     expect(update).toHaveBeenCalledWith({ name: "Updated" });
     expect(eq).toHaveBeenCalledWith("id", "link-1");
+    expect(select).toHaveBeenCalledWith("short_code");
+    expect(purgeLinkMetadataCacheQuietly).toHaveBeenCalledWith("ABC123");
     expect(hashPassword).not.toHaveBeenCalled();
   });
 
   it("clears password when empty string provided", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
-    const update = vi.fn().mockReturnValue({ eq });
+    const { update } = mockUpdateChain();
     vi.mocked(supabase.from).mockReturnValue({ update } as never);
 
     await updateLinkInDB("link-1", { name: "Test" }, "");
@@ -353,8 +366,7 @@ describe("updateLinkInDB", () => {
   });
 
   it("sets new password hash when password provided", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
-    const update = vi.fn().mockReturnValue({ eq });
+    const { update } = mockUpdateChain();
     vi.mocked(supabase.from).mockReturnValue({ update } as never);
 
     await updateLinkInDB("link-1", { name: "Test" }, "new-password");
@@ -369,8 +381,7 @@ describe("updateLinkInDB", () => {
   });
 
   it("updates webhook_url when provided in link updates", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
-    const update = vi.fn().mockReturnValue({ eq });
+    const { update } = mockUpdateChain("HOOK99");
     vi.mocked(supabase.from).mockReturnValue({ update } as never);
 
     await updateLinkInDB("link-1", { webhook_url: "https://hooks.example.com/qrlive" });
@@ -378,11 +389,11 @@ describe("updateLinkInDB", () => {
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({ webhook_url: "https://hooks.example.com/qrlive" })
     );
+    expect(purgeLinkMetadataCacheQuietly).toHaveBeenCalledWith("HOOK99");
   });
 
   it("throws on supabase error", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: { message: "DB error" } });
-    const update = vi.fn().mockReturnValue({ eq });
+    const { update } = mockUpdateChain("ABC123", { message: "DB error" });
     vi.mocked(supabase.from).mockReturnValue({ update } as never);
 
     await expect(updateLinkInDB("link-1", { name: "Test" })).rejects.toEqual({ message: "DB error" });
@@ -393,6 +404,10 @@ describe("updateLinkInDB", () => {
 
 describe("updateGeoRoutesInDB", () => {
   it("calls upsert_geo_routes RPC with mapped params", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { short_code: "ABC123" }, error: null });
+    const eq = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq });
+    vi.mocked(supabase.from).mockReturnValue({ select } as never);
     vi.mocked(supabase.rpc).mockResolvedValue({ error: null } as never);
 
     await updateGeoRoutesInDB("link-1", [
@@ -410,9 +425,14 @@ describe("updateGeoRoutesInDB", () => {
         },
       ],
     });
+    expect(purgeLinkMetadataCacheQuietly).toHaveBeenCalledWith("ABC123");
   });
 
   it("sets bypass_url to empty string when not provided", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { short_code: "US1234" }, error: null });
+    const eq = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq });
+    vi.mocked(supabase.from).mockReturnValue({ select } as never);
     vi.mocked(supabase.rpc).mockResolvedValue({ error: null } as never);
 
     await updateGeoRoutesInDB("link-1", [
@@ -426,6 +446,10 @@ describe("updateGeoRoutesInDB", () => {
   });
 
   it("throws on RPC error", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { short_code: "ERR123" }, error: null });
+    const eq = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq });
+    vi.mocked(supabase.from).mockReturnValue({ select } as never);
     vi.mocked(supabase.rpc).mockResolvedValue({ error: { message: "RPC failed" } } as never);
 
     await expect(
@@ -438,21 +462,42 @@ describe("updateGeoRoutesInDB", () => {
 
 describe("deleteLinkInDB", () => {
   it("deletes link by id", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
-    const deleteFn = vi.fn().mockReturnValue({ eq });
-    vi.mocked(supabase.from).mockReturnValue({ delete: deleteFn } as never);
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { short_code: "DEL123" }, error: null });
+    const eqSelect = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq: eqSelect });
+    const eqDelete = vi.fn().mockResolvedValue({ error: null });
+    const deleteFn = vi.fn().mockReturnValue({ eq: eqDelete });
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "qr_links") {
+        const callCount = vi.mocked(supabase.from).mock.calls.filter((call) => call[0] === "qr_links").length;
+        return callCount === 1 ? ({ select } as never) : ({ delete: deleteFn } as never);
+      }
+      return {} as never;
+    });
 
     await deleteLinkInDB("link-1");
 
     expect(supabase.from).toHaveBeenCalledWith("qr_links");
     expect(deleteFn).toHaveBeenCalled();
-    expect(eq).toHaveBeenCalledWith("id", "link-1");
+    expect(eqDelete).toHaveBeenCalledWith("id", "link-1");
+    expect(purgeLinkMetadataCacheQuietly).toHaveBeenCalledWith("DEL123");
   });
 
   it("throws on supabase error", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: { message: "Delete failed" } });
-    const deleteFn = vi.fn().mockReturnValue({ eq });
-    vi.mocked(supabase.from).mockReturnValue({ delete: deleteFn } as never);
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { short_code: "DEL123" }, error: null });
+    const eqSelect = vi.fn().mockReturnValue({ maybeSingle });
+    const select = vi.fn().mockReturnValue({ eq: eqSelect });
+    const eqDelete = vi.fn().mockResolvedValue({ error: { message: "Delete failed" } });
+    const deleteFn = vi.fn().mockReturnValue({ eq: eqDelete });
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "qr_links") {
+        const callCount = vi.mocked(supabase.from).mock.calls.filter((call) => call[0] === "qr_links").length;
+        return callCount === 1 ? ({ select } as never) : ({ delete: deleteFn } as never);
+      }
+      return {} as never;
+    });
 
     await expect(deleteLinkInDB("link-1")).rejects.toEqual({ message: "Delete failed" });
   });

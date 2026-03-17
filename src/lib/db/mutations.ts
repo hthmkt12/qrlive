@@ -2,6 +2,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword } from "@/lib/password-utils";
+import { purgeLinkMetadataCacheQuietly } from "@/lib/link-cache-invalidation";
 import type { QRLinkRow, QrConfig } from "./models";
 
 /** Generate a 6-char alphanumeric short code, retrying up to 5 times on collision */
@@ -123,14 +124,26 @@ export async function updateLinkInDB(
   }
 
   const payload = passwordFields ? { ...updates, ...passwordFields } : updates;
-  const { error } = await supabase.from("qr_links").update(payload).eq("id", id);
+  const { data, error } = await supabase
+    .from("qr_links")
+    .update(payload)
+    .eq("id", id)
+    .select("short_code")
+    .single();
   if (error) throw error;
+  await purgeLinkMetadataCacheQuietly(data?.short_code);
 }
 
 export async function updateGeoRoutesInDB(
   linkId: string,
   geoRoutes: { country: string; countryCode: string; targetUrl: string; bypassUrl?: string }[]
 ) {
+  const { data: link } = await supabase
+    .from("qr_links")
+    .select("short_code")
+    .eq("id", linkId)
+    .maybeSingle();
+
   // Atomic delete + insert via Postgres function — prevents partial state on insert failure
   const { error } = await supabase.rpc("upsert_geo_routes", {
     p_link_id: linkId,
@@ -142,9 +155,21 @@ export async function updateGeoRoutesInDB(
     })),
   });
   if (error) throw error;
+  await purgeLinkMetadataCacheQuietly(link?.short_code);
 }
 
 export async function deleteLinkInDB(id: string) {
-  const { error } = await supabase.from("qr_links").delete().eq("id", id);
+  const { data: link } = await supabase
+    .from("qr_links")
+    .select("short_code")
+    .eq("id", id)
+    .maybeSingle();
+
+  await purgeLinkMetadataCacheQuietly(link?.short_code);
+
+  const { error } = await supabase
+    .from("qr_links")
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
