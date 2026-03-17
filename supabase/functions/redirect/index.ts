@@ -17,7 +17,7 @@ function createAdapter(): SupabaseAdapter {
     async fetchLink(shortCode) {
       const { data, error } = await supabase
         .from("qr_links")
-        .select("id, name, short_code, default_url, webhook_url, expires_at, password_hash, password_salt, geo_routes(*)")
+        .select("id, name, short_code, default_url, webhook_url, webhook_secret, expires_at, password_hash, password_salt, geo_routes(*)")
         .eq("short_code", shortCode)
         .eq("is_active", true)
         .single();
