@@ -125,8 +125,12 @@ export async function openCreateDialog(page: Page) {
 export async function createLink(page: Page, name: string, url: string) {
   await openCreateDialog(page);
   await page.getByPlaceholder("Ví dụ: Netflix US").fill(name);
-  await page.getByPlaceholder("https://example.com").fill(url);
-  await page.getByRole("button", { name: "Tạo link & QR Code" }).click();
+  await page.locator('input[name="defaultUrl"]').fill(url);
+  const submitBtn = page.getByRole("button", { name: "Tạo link & QR Code" });
+  await submitBtn.scrollIntoViewIfNeeded();
+  await submitBtn.click();
+  // Wait for dialog to close (confirms mutation succeeded)
+  await expect(page.getByRole("heading", { name: "Tạo link QR mới" })).toBeHidden({ timeout: 15_000 });
   await expect(getLinkCard(page, name)).toBeVisible();
 }
 
@@ -176,4 +180,5 @@ export async function seedAnalyticsFromLinkCard(
   expect(response.status()).toBeGreaterThanOrEqual(300);
   expect(response.status()).toBeLessThan(400);
   await page.waitForTimeout(1_500);
+  return response;
 }
