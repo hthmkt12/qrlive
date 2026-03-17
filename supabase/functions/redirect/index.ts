@@ -4,6 +4,7 @@ import {
   type HandlerRequest,
   type SupabaseAdapter,
 } from "./redirect-handler.ts";
+import { createLinkMetadataCache, withLinkMetadataCache } from "./redirect-link-cache.ts";
 
 /** Build a SupabaseAdapter backed by the real Supabase client */
 function createAdapter(): SupabaseAdapter {
@@ -68,7 +69,7 @@ async function toHandlerRequest(req: Request): Promise<HandlerRequest> {
 }
 
 Deno.serve(async (req) => {
-  const adapter = createAdapter();
+  const adapter = withLinkMetadataCache(createAdapter(), createLinkMetadataCache());
   const handlerReq = await toHandlerRequest(req);
   const result = await handleRedirect(handlerReq, adapter, {
     queueBackgroundTask: (task) => {
