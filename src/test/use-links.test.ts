@@ -156,7 +156,7 @@ describe("useLinkAnalyticsDetailV2", () => {
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(fetchLinkAnalyticsDetailV2).toHaveBeenCalledWith("link-1", "2026-03-01", "2026-03-16");
+    expect(fetchLinkAnalyticsDetailV2).toHaveBeenCalledWith("link-1", "2026-03-01", "2026-03-16", undefined);
   });
 
   it("fetches without date params when omitted", async () => {
@@ -167,6 +167,17 @@ describe("useLinkAnalyticsDetailV2", () => {
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(fetchLinkAnalyticsDetailV2).toHaveBeenCalledWith("link-1", undefined, undefined);
+    expect(fetchLinkAnalyticsDetailV2).toHaveBeenCalledWith("link-1", undefined, undefined, undefined);
+  });
+
+  it("fetches with country filter when provided", async () => {
+    const qc = makeQueryClient();
+    const { result } = renderHook(
+      () => useLinkAnalyticsDetailV2("link-1", "2026-03-01", "2026-03-16", "VN"),
+      { wrapper: makeWrapper(qc) }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchLinkAnalyticsDetailV2).toHaveBeenCalledWith("link-1", "2026-03-01", "2026-03-16", "VN");
   });
 });

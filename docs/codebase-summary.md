@@ -9,7 +9,7 @@
 **QRLive** is a React-based QR code link shortener with:
 - Geo-routing to 15 countries
 - Bypass URLs for geo-blocking
-- Real-time click analytics
+- Real-time click analytics with referer breakdown per country
 - Click webhook notifications
 - QR customization persistence
 - Sentry error tracking
@@ -29,12 +29,12 @@
 |--------|-------|
 | **Total Files** | 150+ |
 | **Repo Tokens** | ~102K |
-| **Tests** | 308 passing unit/integration tests (289 app + 19 worker) + 30 Playwright E2E |
+| **Tests** | 312 passing unit/integration tests (293 app + 19 worker) + 30 Playwright E2E |
 | **Code Files** | ~60 (src/ + supabase/ + functions/) |
 | **Dependencies** | 46 prod + 25 dev |
 | **Build Time** | ~5s (passes; Vite chunk-size warning remains) |
 | **Bundle Size** | 147KB gzipped (main), StatsPanel/StatsCharts lazy-loaded |
-| **Last Updated** | 2026-03-17 (click webhooks, PR CI, worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
+| **Last Updated** | 2026-03-17 (referer-by-country analytics, click webhooks, PR CI, worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
 
 ---
 
@@ -62,7 +62,7 @@ qrlive/
 │   │   ├── types.ts           # TypeScript types
 │   │   └── query-keys.ts      # React Query keys
 │   ├── integrations/supabase/ # Supabase client & types
-│   ├── test/                  # 289 unit/integration tests (24 files, app project)
+│   ├── test/                  # 293 unit/integration tests (24 files, app project)
 │   ├── App.tsx                # Root component + routing (code-split)
 │   ├── main.tsx               # Entry point
 │   └── index.css              # Tailwind + global styles
@@ -74,7 +74,7 @@ qrlive/
 │   │   ├── redirect-password.ts # Password verification + protected-link form helper [NEW 2026-03-17]
 │   │   └── index.ts             # Thin Deno wrapper + background webhook queueing
 │   ├── functions/proxy/         # Content-fetch proxy (FALLBACK/TESTING ONLY)
-│   └── migrations/            # 13 database migrations
+│   └── migrations/            # 14 database migrations
 │
 ├── cloudflare-worker/           # ✅ Canonical redirect-domain gateway (r.yourdomain.com → Supabase edge)
 │   ├── redirect-proxy.js        # Worker handler (extractShortCode, buildUpstreamHeaders, fetch)
@@ -101,6 +101,9 @@ Additional service: `proxy-gateway/` contains the always-on bypass gateway for H
 
 ## Recent Additions (2026-03-17)
 
+### New Analytics Backend
+- **supabase/migrations/20260317170000_referer_breakdown_by_country_rpc.sql** — Adds `get_link_click_detail_v3` so referer breakdowns can be filtered by country without ratio-based estimation
+
 ### New Library Modules
 - **src/lib/sentry-config.ts** — Initializes `@sentry/react`, Browser Tracing, Replay sampling, and exports the shared error boundary
 - **src/lib/analytics-export-utils.ts** — Generates analytics CSV payloads and triggers CSV/PDF export flows
@@ -124,6 +127,9 @@ Additional service: `proxy-gateway/` contains the always-on bypass gateway for H
 - **.github/workflows/ci.yml** — PR CI workflow for lint, typecheck, Vitest, production build, and secret-gated Playwright E2E
 
 ---
+
+### New Documentation Surface
+- **docs/openapi.yaml** â€” OpenAPI 3.1 contract for redirect endpoints, proxy surfaces, and the `click.created` webhook payload
 
 ## Core Components
 
@@ -390,7 +396,7 @@ Auth-gated specs read `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` from `.env.local`
 
 **Run Tests**:
 ```bash
-npm run test          # Run all 308 tests (app + worker)
+npm run test          # Run all 312 tests (app + worker)
 npm run gateway:test  # Run proxy-gateway smoke tests
 npm run test:e2e      # Playwright E2E (30 tests)
 npm run test:watch   # Watch mode
@@ -465,6 +471,7 @@ supabase functions deploy redirect --no-verify-jwt
 | **cloudflare-worker/redirect-proxy.test.js** | 19 Vitest tests: proxy contract, headers, errors [NEW 2026-03-17] |
 | **cloudflare-worker/wrangler.toml** | Wrangler deployment config (secrets: SUPABASE_URL, SUPABASE_ANON_KEY) |
 | **cloudflare-worker/README.md** | Worker setup, secrets, deploy, test instructions [NEW 2026-03-17] |
+| **docs/openapi.yaml** | OpenAPI 3.1 contract for redirect endpoints, proxy surfaces, and click webhook payloads [NEW 2026-03-17] |
 | **supabase/functions/redirect/click-webhook.ts** | `click.created` payload builder + POST delivery helper [NEW 2026-03-17] |
 | **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (webhook queueing + click gating) [UPDATED 2026-03-17] |
 | **supabase/functions/redirect/redirect-password.ts** | Password verification + protected-link form HTML [NEW 2026-03-17] |
@@ -659,6 +666,6 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-17 (click webhooks, worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
+**Last Updated**: 2026-03-17 (referer-by-country analytics, click webhooks, worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
 **Next Review**: 2026-04-16
-**Version**: v1.7 | **Tests**: 308/308 unit+integration passing (289 app + 19 worker) + 30 E2E | **Status**: Production-ready
+**Version**: v1.7 | **Tests**: 312/312 unit+integration passing (293 app + 19 worker) + 30 E2E | **Status**: Production-ready

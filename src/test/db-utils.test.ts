@@ -204,7 +204,7 @@ describe("fetchLinkAnalyticsDetailV2", () => {
     vi.clearAllMocks();
   });
 
-  it("calls get_link_click_detail_v2 RPC with link_id and date params", async () => {
+  it("calls get_link_click_detail_v3 RPC with link_id, date params, and country filter", async () => {
     vi.mocked(supabase.rpc).mockResolvedValue({
       data: [
         {
@@ -220,12 +220,13 @@ describe("fetchLinkAnalyticsDetailV2", () => {
       error: null,
     } as never);
 
-    const result = await fetchLinkAnalyticsDetailV2("link-1", "2026-03-10", "2026-03-16");
+    const result = await fetchLinkAnalyticsDetailV2("link-1", "2026-03-10", "2026-03-16", "VN");
 
-    expect(supabase.rpc).toHaveBeenCalledWith("get_link_click_detail_v2", {
+    expect(supabase.rpc).toHaveBeenCalledWith("get_link_click_detail_v3", {
       p_link_id: "link-1",
       p_start_date: "2026-03-10",
       p_end_date: "2026-03-16",
+      p_country_code: "VN",
     });
     expect(result.total_clicks).toBe(10);
     expect(result.clicks_by_day).toEqual([{ date: "2026-03-10", clicks: 5 }]);
@@ -236,7 +237,7 @@ describe("fetchLinkAnalyticsDetailV2", () => {
 
     await fetchLinkAnalyticsDetailV2("link-2");
 
-    expect(supabase.rpc).toHaveBeenCalledWith("get_link_click_detail_v2", {
+    expect(supabase.rpc).toHaveBeenCalledWith("get_link_click_detail_v3", {
       p_link_id: "link-2",
     });
   });
@@ -294,6 +295,7 @@ describe("QUERY_KEYS.analytics.detailV2", () => {
   it("uses 'default' placeholder when dates are omitted", () => {
     const key = QUERY_KEYS.analytics.detailV2("link-1");
     expect(key).toContain("default");
+    expect(key).toContain("all");
   });
 
   it("produces different keys for different date ranges", () => {
@@ -306,5 +308,11 @@ describe("QUERY_KEYS.analytics.detailV2", () => {
     const keyA = QUERY_KEYS.analytics.detailV2("link-A", "2026-03-10", "2026-03-16");
     const keyB = QUERY_KEYS.analytics.detailV2("link-B", "2026-03-10", "2026-03-16");
     expect(keyA).not.toEqual(keyB);
+  });
+
+  it("produces different keys for different country filters", () => {
+    const keyAll = QUERY_KEYS.analytics.detailV2("link-1", "2026-03-10", "2026-03-16");
+    const keyVn = QUERY_KEYS.analytics.detailV2("link-1", "2026-03-10", "2026-03-16", "VN");
+    expect(keyAll).not.toEqual(keyVn);
   });
 });

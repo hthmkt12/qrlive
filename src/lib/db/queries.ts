@@ -40,13 +40,15 @@ export async function fetchLinkAnalyticsSummaries(
 export async function fetchLinkAnalyticsDetailV2(
   linkId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  countryCode?: string
 ): Promise<LinkAnalyticsDetailRow> {
   const params: Record<string, unknown> = { p_link_id: linkId };
   if (startDate) params.p_start_date = startDate;
   if (endDate) params.p_end_date = endDate;
+  if (countryCode && countryCode !== "all") params.p_country_code = countryCode;
 
-  const { data, error } = await supabase.rpc("get_link_click_detail_v2", params);
+  const { data, error } = await supabase.rpc("get_link_click_detail_v3", params);
 
   if (error) throw error;
 

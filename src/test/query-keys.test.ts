@@ -27,11 +27,16 @@ describe("QUERY_KEYS", () => {
 
   it("analytics.detailV2 uses 'default' when dates omitted", () => {
     const key = QUERY_KEYS.analytics.detailV2("link-1");
-    expect(key).toEqual(["links", "analytics", "detail", "link-1", "default", "default"]);
+    expect(key).toEqual(["links", "analytics", "detail", "link-1", "default", "default", "all"]);
   });
 
   it("analytics.detailV2 includes dates when provided", () => {
     const key = QUERY_KEYS.analytics.detailV2("link-1", "2026-03-01", "2026-03-16");
-    expect(key).toEqual(["links", "analytics", "detail", "link-1", "2026-03-01", "2026-03-16"]);
+    expect(key).toEqual(["links", "analytics", "detail", "link-1", "2026-03-01", "2026-03-16", "all"]);
+  });
+
+  it("analytics.detailV2 includes the selected country when provided", () => {
+    const key = QUERY_KEYS.analytics.detailV2("link-1", "2026-03-01", "2026-03-16", "VN");
+    expect(key).toEqual(["links", "analytics", "detail", "link-1", "2026-03-01", "2026-03-16", "VN"]);
   });
 });

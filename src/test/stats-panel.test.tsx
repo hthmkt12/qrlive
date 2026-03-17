@@ -5,17 +5,33 @@ import userEvent from "@testing-library/user-event";
 import { StatsPanel } from "@/components/StatsPanel";
 import { QRLinkRow, LinkAnalyticsDetailRow } from "@/lib/db";
 
+const { mockUseLinkAnalyticsDetailV2 } = vi.hoisted(() => ({
+  mockUseLinkAnalyticsDetailV2: vi.fn(() => ({ data: undefined, isLoading: false })),
+}));
+
 // ─── Mock dependencies ────────────────────────────────────────────────────────
 
 // Mock useLinkAnalyticsDetailV2 so StatsPanel renders with fallback analytics prop
 vi.mock("@/hooks/use-links", () => ({
-  useLinkAnalyticsDetailV2: () => ({ data: undefined, isLoading: false }),
+  useLinkAnalyticsDetailV2: mockUseLinkAnalyticsDetailV2,
 }));
 
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   },
+}));
+
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ value, onValueChange, children }: any) => (
+    <select aria-label="Lọc theo quốc gia" value={value} onChange={(event) => onValueChange(event.target.value)}>
+      {children}
+    </select>
+  ),
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => <option value={value}>{children}</option>,
+  SelectTrigger: () => null,
+  SelectValue: () => null,
 }));
 
 vi.mock("@/components/QRPreview", () => ({
@@ -111,6 +127,7 @@ const mockAnalyticsDetail: LinkAnalyticsDetailRow = {
 describe("StatsPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseLinkAnalyticsDetailV2.mockReturnValue({ data: undefined, isLoading: false });
   });
 
   it("renders back button", () => {
@@ -179,6 +196,27 @@ describe("StatsPanel", () => {
     const cards = screen.getAllByText(/Quốc gia/);
     const countriesCard = cards[0].closest("div[class*='rounded-xl']");
     expect(countriesCard).toHaveTextContent("5");
+  });
+
+  it("requests analytics again with the selected country filter", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <StatsPanel
+        link={mockLink}
+        analytics={mockAnalyticsDetail}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.selectOptions(screen.getByLabelText("Lọc theo quốc gia"), "VN");
+
+    expect(mockUseLinkAnalyticsDetailV2).toHaveBeenLastCalledWith(
+      "link-1",
+      expect.any(String),
+      expect.any(String),
+      "VN"
+    );
   });
 
   it("displays loading state when isLoading is true", () => {

@@ -34,11 +34,12 @@ export function useLinkAnalyticsDetail(linkId: string | null) {
 export function useLinkAnalyticsDetailV2(
   linkId: string | null,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  countryCode?: string
 ) {
   return useQuery({
-    queryKey: QUERY_KEYS.analytics.detailV2(linkId || "none", startDate, endDate),
-    queryFn: () => fetchLinkAnalyticsDetailV2(linkId!, startDate, endDate),
+    queryKey: QUERY_KEYS.analytics.detailV2(linkId || "none", startDate, endDate, countryCode),
+    queryFn: () => fetchLinkAnalyticsDetailV2(linkId!, startDate, endDate, countryCode),
     enabled: !!linkId,
     staleTime: 30_000,
   });

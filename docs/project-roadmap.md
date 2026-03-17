@@ -91,7 +91,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Proxy gateway smoke tests (3 tests)
 - [x] Analytics query helper tests (4 tests)
 - [x] Cloudflare Worker proxy tests (19 tests) — contract, error handling
-- [x] All tests passing (308/308 across 25 test files, via `test.projects`)
+- [x] All tests passing (312/312 across 25 test files, via `test.projects`)
 - [x] Test setup & fixtures
 
 ### Phase 08: Deployment ✅
@@ -99,7 +99,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Supabase backend setup
 - [x] Edge function deployment
 - [x] Environment variable configuration
-- [x] Database migrations (13 migrations)
+- [x] Database migrations (14 migrations)
 - [x] RLS policies enforced
 - [x] Auto-deploy from GitHub
 - [x] Production URL (qrlive.vercel.app)
@@ -122,6 +122,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 
 ### Phase 11: Analytics Enhancements ✅
 - [x] Country filter in StatsPanel
+- [x] Referer breakdown per country via `get_link_click_detail_v3`
 - [x] Quick range toggles (7/30/90 ngày + custom)
 - [x] CSV export for analytics detail
 - [x] PDF export via browser print flow
@@ -185,7 +186,7 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **>80% test coverage** | ✅ 308 tests, 25 files (289 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
+| **>80% test coverage** | ✅ 312 tests, 25 files (293 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
 | **Component + hook + page + db mutation tests** | ✅ 70+ new tests added (use-links, analytics-date-range-picker, query-keys, pages-*, db-mutations) | Complete | ✅ Complete (2026-03-16) |
 | **Redirect handler + webhook helper tests** | ✅ Real edge logic plus click webhook delivery coverage | Complete | ✅ Complete (2026-03-17) |
 | **Analytics pre-aggregation/caching** | Stats panel uses aggregate RPCs; higher-volume reports may want cached rollups | Medium | Pending |
@@ -195,7 +196,7 @@ None currently blocking.
 
 **Details**:
 1. **Component test coverage**: ✅ Complete (2026-03-17). 53 + 12 + 18 = 83 component/hook tests.
-   - UI, hooks, pages, and data-layer tests now span 308 tests across 25 files (289 app + 19 worker).
+   - UI, hooks, pages, and data-layer tests now span 312 tests across 25 files (293 app + 19 worker).
    - Direct redirect-handler coverage was added on top of the earlier simulator tests.
 
 2. **Link expiration & password protection**: ✅ Completed (2026-03-16).
@@ -219,7 +220,7 @@ None currently blocking.
    - Credentialed Playwright E2E runs automatically when `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `E2E_TEST_EMAIL`, and `E2E_TEST_PASSWORD` secrets are present.
 
 ### Low Priority
-- [ ] API documentation (OpenAPI/Swagger)
+- [x] API documentation (OpenAPI/Swagger) — `docs/openapi.yaml`
 - [ ] Full deployed edge-function E2E verification with seeded test account
 
 ---
@@ -228,7 +229,7 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 308 tests, 25 files (289 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
+| **Test Coverage** | >80% | 312 tests, 25 files (293 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
 | **Build Time** | <30s | ~5s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
@@ -248,11 +249,11 @@ None currently blocking.
 #### 1. Advanced Analytics ✅ (COMPLETED 2026-03-17)
 - [x] Date range filtering (analytics-date-range-picker.tsx + RPC)
 - [x] Country-specific filtering (dashboard StatsPanel dropdown)
-- [ ] Referer breakdown by country
+- [x] Referer breakdown by country
 - [x] Click trend analysis (7-day, 30-day, 90-day views)
 - [x] Export analytics (CSV, PDF)
 
-**Effort**: 1-2 weeks | **Impact**: High (user engagement) | **Status**: Core delivery complete, referer-by-country still pending
+**Effort**: 1-2 weeks | **Impact**: High (user engagement) | **Status**: Complete
 
 #### 2. Link Management Enhancements ✅ (COMPLETED 2026-03-17)
 - [x] Link expiration dates (auto-disable after date) ✅
@@ -309,7 +310,7 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (308 tests, 25 files) ✅
+### Current Coverage (312 tests, 25 files) ✅
 - ✅ Schemas & validation (17 tests)
 - ✅ Database & data layer (57 tests)
 - ✅ Auth context (8 tests)
@@ -327,7 +328,7 @@ None currently blocking.
 - [ ] Integration tests (create link → redirect → analytics)
 - [ ] Full end-to-end deployed edge function + webhook monitor
 
-**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 308 tests across 25 files
+**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 312 tests across 25 files
 
 ---
 
@@ -378,9 +379,9 @@ None currently blocking.
 - deployment-guide.md
 - project-roadmap.md
 - codebase-summary.md
+- openapi.yaml
 
 ### To Add
-- [ ] API documentation (OpenAPI spec)
 - [ ] User guide (how to use the app)
 - [ ] FAQ section
 - [ ] Troubleshooting guide
@@ -437,16 +438,16 @@ None identified.
 - [x] Bypass URL support
 
 ### V1.0 (Next Phase)
-- [x] >80% test coverage ✅ (2026-03-17: 308 tests across 25 files)
+- [x] >80% test coverage ✅ (2026-03-17: 312 tests across 25 files)
 - [x] Component tests added ✅ (2026-03-16: 51 component tests)
 - [x] Hook tests added ✅ (2026-03-16: 50+ hook tests)
 - [x] Page component tests ✅ (2026-03-16: 30+ page tests)
 - [x] Link expiration ✅ (2026-03-16: expires_at field + validation)
 - [x] Password-protected links ✅ (2026-03-16: PBKDF2-HMAC-SHA256 hashing + constant-time verify + legacy compat)
-- [x] Advanced analytics ✅ (2026-03-17: country filter + export + quick ranges)
+- [x] Advanced analytics ✅ (2026-03-17: country filter + referer-by-country + export + quick ranges)
 - [x] E2E tests with Playwright ✅ (2026-03-17: 30 passed, 0 skipped — auth/CRUD/QR/analytics/bulk/redirect specs)
 - [x] Webhook integrations ✅ (2026-03-17: per-link click.created POST notifications)
-- [ ] API documentation
+- [x] API documentation âœ… (2026-03-17: OpenAPI 3.1 spec for redirect, proxy, and webhook surfaces)
 - [ ] User guide
 
 ### V2.0 (Platform)

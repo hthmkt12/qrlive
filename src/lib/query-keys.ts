@@ -6,7 +6,7 @@ export const QUERY_KEYS = {
     all: ["links", "analytics"] as const,
     summaries: (linkIds: string[]) => ["links", "analytics", "summaries", ...linkIds] as const,
     detail: (id: string) => ["links", "analytics", "detail", id] as const,
-    detailV2: (id: string, start?: string, end?: string) =>
-      ["links", "analytics", "detail", id, start ?? "default", end ?? "default"] as const,
+    detailV2: (id: string, start?: string, end?: string, country?: string) =>
+      ["links", "analytics", "detail", id, start ?? "default", end ?? "default", country ?? "all"] as const,
   },
 } as const;

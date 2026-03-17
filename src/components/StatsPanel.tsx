@@ -53,20 +53,22 @@ function rangeDays(range: DateRange): number {
 function filterAnalyticsByCountry(analytics: LinkAnalyticsDetailRow, countryCode: string): LinkAnalyticsDetailRow {
   if (countryCode === "all") return analytics;
   const countryEntry = analytics.country_breakdown.find((entry) => entry.country_code === countryCode);
-  const filteredClicks = countryEntry?.clicks ?? 0;
-  const ratio = analytics.total_clicks > 0 ? filteredClicks / analytics.total_clicks : 0;
   return {
     ...analytics,
-    total_clicks: filteredClicks,
+    total_clicks: countryEntry?.clicks ?? 0,
     country_breakdown: countryEntry ? [countryEntry] : [],
-    referer_breakdown: analytics.referer_breakdown.map((entry) => ({ ...entry, clicks: Math.round(entry.clicks * ratio) })),
   };
 }
 
 export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: externalLoading = false, onBack }: StatsPanelProps) {
   const [dateRange, setDateRange] = useState<DateRange>(defaultDateRange);
   const [selectedCountry, setSelectedCountry] = useState("all");
-  const { data: rangedAnalytics, isLoading: rangedLoading } = useLinkAnalyticsDetailV2(link.id, dateRange.startDate, dateRange.endDate);
+  const { data: rangedAnalytics, isLoading: rangedLoading } = useLinkAnalyticsDetailV2(
+    link.id,
+    dateRange.startDate,
+    dateRange.endDate,
+    selectedCountry === "all" ? undefined : selectedCountry
+  );
   const rawAnalytics = rangedAnalytics ?? fallbackAnalytics;
   const analytics = filterAnalyticsByCountry(rawAnalytics, selectedCountry);
   const isLoading = externalLoading || rangedLoading;
