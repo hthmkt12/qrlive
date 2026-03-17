@@ -11,6 +11,7 @@ All significant changes, features, and fixes documented here.
 ### Added
 - OpenAPI 3.1 spec in `docs/openapi.yaml` covering redirect endpoints, Worker gateway paths, fallback proxy, proxy-gateway health, and the `click.created` webhook payload
 - Real referer breakdown per country via `get_link_click_detail_v3`, wired through analytics query cache keys and StatsPanel country filtering
+- Optional Redis caching for hot public links in the redirect edge function, plus authenticated cache invalidation after dashboard link edits, toggles, geo-route changes, and deletes
 
 ### Planned Features
 - User guide

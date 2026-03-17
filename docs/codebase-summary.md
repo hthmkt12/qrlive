@@ -10,6 +10,7 @@
 - Geo-routing to 15 countries
 - Bypass URLs for geo-blocking
 - Real-time click analytics with referer breakdown per country
+- Optional Redis cache for hot public links
 - Click webhook notifications
 - QR customization persistence
 - Sentry error tracking
@@ -29,12 +30,12 @@
 |--------|-------|
 | **Total Files** | 150+ |
 | **Repo Tokens** | ~102K |
-| **Tests** | 312 passing unit/integration tests (293 app + 19 worker) + 30 Playwright E2E |
+| **Tests** | 323 passing unit/integration tests (304 app + 19 worker) + 30 Playwright E2E |
 | **Code Files** | ~60 (src/ + supabase/ + functions/) |
 | **Dependencies** | 46 prod + 25 dev |
 | **Build Time** | ~5s (passes; Vite chunk-size warning remains) |
 | **Bundle Size** | 147KB gzipped (main), StatsPanel/StatsCharts lazy-loaded |
-| **Last Updated** | 2026-03-17 (referer-by-country analytics, click webhooks, PR CI, worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
+| **Last Updated** | 2026-03-17 (Redis hot-link cache, referer-by-country analytics, click webhooks, PR CI, worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
 
 ---
 
@@ -305,6 +306,7 @@ Create/update/delete mutations trigger targeted invalidation for `QUERY_KEYS.lin
 
 **Key Details**:
 - Handler logic extracted into `redirect-handler.ts` with `SupabaseAdapter` interface for testability
+- Optional Redis cache now wraps `fetchLink` in the adapter layer, so redirect validation, click recording, and webhooks still flow through the same handler
 - Background webhook delivery uses `EdgeRuntime.waitUntil` in `index.ts`
 - Geo detection: Cloudflare header only (local dev: manual header)
 - Bot pattern: `/bot|crawler|spider|prerender|headless|facebookexternalhit|twitterbot|slurp/i`
@@ -313,6 +315,7 @@ Create/update/delete mutations trigger targeted invalidation for `QUERY_KEYS.lin
 - Expiration: Return 410 Gone if link expired
 - Password: PBKDF2-HMAC-SHA256 verification with constant-time comparison; legacy SHA-256 compat; opportunistic rehash
 - Webhook payload: `click.created` with link info, redirect target, geo-routing flag, country code, and referer
+- Cache stores only public link metadata, caps TTL by `expires_at`, and is purged after dashboard mutations via `link-cache-invalidate`
 
 ---
 
@@ -327,6 +330,9 @@ VITE_SUPABASE_PUBLISHABLE_KEY=[anon-key]
 ### For Edge Function (Supabase secrets)
 ```
 SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
+UPSTASH_REDIS_REST_URL=[optional-upstash-rest-url]
+UPSTASH_REDIS_REST_TOKEN=[optional-upstash-rest-token]
+UPSTASH_REDIS_LINK_TTL_SECONDS=60
 ```
 
 ### Optional for credentialed E2E dashboard flows
@@ -396,7 +402,7 @@ Auth-gated specs read `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` from `.env.local`
 
 **Run Tests**:
 ```bash
-npm run test          # Run all 312 tests (app + worker)
+npm run test          # Run all 323 tests (app + worker)
 npm run gateway:test  # Run proxy-gateway smoke tests
 npm run test:e2e      # Playwright E2E (30 tests)
 npm run test:watch   # Watch mode
@@ -473,9 +479,12 @@ supabase functions deploy redirect --no-verify-jwt
 | **cloudflare-worker/README.md** | Worker setup, secrets, deploy, test instructions [NEW 2026-03-17] |
 | **docs/openapi.yaml** | OpenAPI 3.1 contract for redirect endpoints, proxy surfaces, and click webhook payloads [NEW 2026-03-17] |
 | **supabase/functions/redirect/click-webhook.ts** | `click.created` payload builder + POST delivery helper [NEW 2026-03-17] |
+| **supabase/functions/redirect/redirect-link-cache.ts** | Optional Redis-backed cache wrapper for hot public link metadata [NEW 2026-03-17] |
 | **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (webhook queueing + click gating) [UPDATED 2026-03-17] |
 | **supabase/functions/redirect/redirect-password.ts** | Password verification + protected-link form HTML [NEW 2026-03-17] |
 | **supabase/functions/redirect/index.ts** | Thin Deno wrapper for redirect handler + background tasks |
+| **supabase/functions/link-cache-invalidate/index.ts** | Authenticated edge endpoint for purging Redis hot-link cache entries [NEW 2026-03-17] |
+| **supabase/functions/_shared/link-metadata-cache.ts** | Shared Redis REST helper for cached link metadata [NEW 2026-03-17] |
 
 ---
 
@@ -579,7 +588,7 @@ supabase functions deploy redirect --no-verify-jwt
 
 | Issue | Severity | Fix Time | Status |
 |-------|----------|----------|--------|
-| App/component/hook test expansion | Medium | ✅ Complete | 289 tests across 24 files |
+| App/component/hook test expansion | Medium | ✅ Complete | 304 tests across 26 files |
 | Redirect handler + webhook helper tests | Medium | ✅ Complete | 2026-03-17 |
 | Long-range analytics pre-aggregation | Medium | 1-2 hours | Pending |
 | Main bundle size reduction (790KB → 490KB) | Low | ✅ Fixed | Code-split, lazy-loaded |
@@ -666,6 +675,6 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-17 (referer-by-country analytics, click webhooks, worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
+**Last Updated**: 2026-03-17 (Redis hot-link cache, referer-by-country analytics, click webhooks, worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
 **Next Review**: 2026-04-16
-**Version**: v1.7 | **Tests**: 312/312 unit+integration passing (293 app + 19 worker) + 30 E2E | **Status**: Production-ready
+**Version**: v1.7 | **Tests**: 323/323 unit+integration passing (304 app + 19 worker) + 30 E2E | **Status**: Production-ready

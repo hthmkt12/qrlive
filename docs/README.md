@@ -55,6 +55,13 @@ Welcome to the QRLive documentation repository. All files provide comprehensive 
 
 ---
 
+### 8. [openapi.yaml](./openapi.yaml) - API & Webhook Contract
+**Audience**: Integrators, backend developers, QA, tooling
+**Purpose**: Machine-readable OpenAPI 3.1 spec for redirect endpoints, proxy surfaces, and the `click.created` webhook payload
+**Read this** when you need request/response schemas, headers, or webhook examples.
+
+---
+
 ## Quick Start Paths
 
 ### I'm a New Developer
@@ -93,15 +100,10 @@ Welcome to the QRLive documentation repository. All files provide comprehensive 
 
 ## File Statistics
 
-| File | LOC | Size | Focus |
-|------|-----|------|-------|
-| project-overview-pdr.md | 203 | 7.4K | Project definition |
-| system-architecture.md | 440 | 17K | Technical design |
-| code-standards.md | 668 | 18K | Development patterns |
-| deployment-guide.md | 529 | 14K | Operations & setup |
-| project-roadmap.md | 437 | 13K | Status & evolution |
-| codebase-summary.md | 499 | 13K | Quick reference |
-| **TOTAL** | **2,776** | **82K** | Comprehensive docs |
+- 8 core documentation files plus a machine-readable OpenAPI spec
+- Human-readable status and architecture live in Markdown under `docs/`
+- HTTP contract and webhook payload schemas live in `docs/openapi.yaml`
+- For the latest project metrics, use [codebase-summary.md](./codebase-summary.md)
 
 All files under 800 LOC limit ✅
 
@@ -133,12 +135,12 @@ A production-ready web app that creates short, scannable QR links routing visito
 
 ### Key Metrics
 - **Status**: MVP complete, production-ready
-- **Tests**: 33 passing (66% coverage)
+- **Tests**: 308 unit/integration passing + 30 Playwright E2E
 - **Live**: https://qrlive.vercel.app
 - **Load Time**: ~1.5s
 - **Redirect Latency**: ~50ms
 - **Uptime**: 100% (current)
-- **Known Issues**: 4 medium-priority items
+- **Known Issues**: analytics rollups and deployed webhook monitoring remain the main follow-ups
 
 ---
 
@@ -159,6 +161,11 @@ A production-ready web app that creates short, scannable QR links routing visito
 - Check [project-overview-pdr.md](./project-overview-pdr.md) for requirements
 - Plan new features against roadmap
 
+### For API Integration
+- Start with [openapi.yaml](./openapi.yaml)
+- Cross-check behavior details in [system-architecture.md](./system-architecture.md)
+- Use [deployment-guide.md](./deployment-guide.md) for environment and secret setup
+
 ### For Onboarding
 - New developers start with Quick Start path above
 - Share relevant docs based on role
@@ -176,6 +183,7 @@ When code changes:
 4. **Deployment Changes**: Update deployment-guide.md
 5. **Project Scope Changes**: Update project-overview-pdr.md
 6. **Everything**: Update codebase-summary.md
+7. **HTTP Contract Changes**: Update openapi.yaml
 
 Keep docs in sync with code — don't let them fall out of date.
 
@@ -203,4 +211,4 @@ Keep docs in sync with code — don't let them fall out of date.
 
 ---
 
-**Last Updated**: 2026-03-16 | **Status**: Complete & Production-Ready
+**Last Updated**: 2026-03-17 | **Status**: Complete & Production-Ready

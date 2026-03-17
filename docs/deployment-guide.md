@@ -189,6 +189,21 @@ The Playwright PR job only runs when all four secrets are present. This keeps fo
 
 ---
 
+## API Contract Reference
+
+The machine-readable HTTP contract lives in `docs/openapi.yaml`.
+
+Current documented surfaces:
+- Supabase redirect edge function: `/functions/v1/redirect/{shortCode}`
+- Cloudflare Worker redirect gateway: `/{shortCode}` and `/r/{shortCode}`
+- Fallback Supabase proxy: `/functions/v1/proxy`
+- Proxy gateway health endpoint: `/health`
+- Outbound `click.created` webhook payload
+
+Use the spec when validating integrations, generating collections, or reviewing expected status codes and headers.
+
+---
+
 ## Step 5: Frontend Deployment (Vercel)
 
 ### Connect GitHub to Vercel

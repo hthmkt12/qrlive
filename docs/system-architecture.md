@@ -209,6 +209,7 @@ CREATE TABLE qr_links (
   name TEXT NOT NULL,
   short_code TEXT NOT NULL UNIQUE,  -- auto-generated 6-char or custom 3-20 chars
   default_url TEXT NOT NULL,
+  webhook_url TEXT,
   is_active BOOLEAN DEFAULT true,
   expires_at TIMESTAMP,
   password_hash TEXT,
@@ -318,8 +319,8 @@ CREATE POLICY "owner_select" ON click_events
 | Component | Purpose |
 |-----------|---------|
 | `LinkCard.tsx` | Display single link (name, short code, QR) + actions |
-| `CreateLinkDialog.tsx` | Modal form to create link with geo routes |
-| `EditLinkDialog.tsx` | Modal form to edit existing link |
+| `CreateLinkDialog.tsx` | Modal form to create link with geo routes, password, expiration, and webhook URL |
+| `EditLinkDialog.tsx` | Modal form to edit existing link, QR settings, and click webhook URL |
 | `StatsPanel.tsx` | Analytics shell: range controls, country filter, export actions, QR preview |
 | `QRPreview.tsx` | Render QR code for short link |
 | `analytics-export-button.tsx` | CSV/PDF export dropdown for analytics detail |
@@ -528,6 +529,7 @@ All responses include CORS headers for browser access.
 | Analytics detail RPC | 2026-03-16 | Add get_link_click_detail(uuid) aggregate function |
 | Click events restrict | 2026-03-16 | Drop click_events_insert_public policy; service role only |
 | QR config persistence | 2026-03-17 | Add nullable `qr_config` JSONB column to `qr_links` |
+| Click webhook URL | 2026-03-17 | Add nullable `webhook_url` to `qr_links` for outbound notifications |
 
 ---
 

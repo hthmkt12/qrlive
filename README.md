@@ -133,6 +133,7 @@ All documentation is in the `docs/` directory:
 | **[deployment-guide.md](./docs/deployment-guide.md)** | Step-by-step setup: local, Supabase, Vercel, edge functions |
 | **[project-roadmap.md](./docs/project-roadmap.md)** | Status, completed features, known issues, future plans |
 | **[codebase-summary.md](./docs/codebase-summary.md)** | Quick reference for developers and LLMs |
+| **[openapi.yaml](./docs/openapi.yaml)** | Machine-readable contract for redirect endpoints, proxy surfaces, and click webhooks |
 
 ---
 

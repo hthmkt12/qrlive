@@ -91,7 +91,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Proxy gateway smoke tests (3 tests)
 - [x] Analytics query helper tests (4 tests)
 - [x] Cloudflare Worker proxy tests (19 tests) — contract, error handling
-- [x] All tests passing (312/312 across 25 test files, via `test.projects`)
+- [x] All tests passing (323/323 across 27 test files, via `test.projects`)
 - [x] Test setup & fixtures
 
 ### Phase 08: Deployment ✅
@@ -186,7 +186,7 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **>80% test coverage** | ✅ 312 tests, 25 files (293 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
+| **>80% test coverage** | ✅ 323 tests, 27 files (304 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
 | **Component + hook + page + db mutation tests** | ✅ 70+ new tests added (use-links, analytics-date-range-picker, query-keys, pages-*, db-mutations) | Complete | ✅ Complete (2026-03-16) |
 | **Redirect handler + webhook helper tests** | ✅ Real edge logic plus click webhook delivery coverage | Complete | ✅ Complete (2026-03-17) |
 | **Analytics pre-aggregation/caching** | Stats panel uses aggregate RPCs; higher-volume reports may want cached rollups | Medium | Pending |
@@ -196,7 +196,7 @@ None currently blocking.
 
 **Details**:
 1. **Component test coverage**: ✅ Complete (2026-03-17). 53 + 12 + 18 = 83 component/hook tests.
-   - UI, hooks, pages, and data-layer tests now span 312 tests across 25 files (293 app + 19 worker).
+   - UI, hooks, pages, and data-layer tests now span 323 tests across 27 files (304 app + 19 worker).
    - Direct redirect-handler coverage was added on top of the earlier simulator tests.
 
 2. **Link expiration & password protection**: ✅ Completed (2026-03-16).
@@ -229,7 +229,7 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 312 tests, 25 files (293 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
+| **Test Coverage** | >80% | 323 tests, 27 files (304 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
 | **Build Time** | <30s | ~5s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
@@ -282,7 +282,7 @@ None currently blocking.
 
 #### 5. Performance & Reliability
 - [ ] Database read replicas (scale analytics queries)
-- [ ] Caching layer (Redis for hot links)
+- [x] Caching layer (Redis for hot links)
 - [x] Error tracking (Sentry)
 - [ ] Performance monitoring (Datadog)
 - [ ] Distributed tracing
@@ -310,7 +310,7 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (312 tests, 25 files) ✅
+### Current Coverage (323 tests, 27 files) ✅
 - ✅ Schemas & validation (17 tests)
 - ✅ Database & data layer (57 tests)
 - ✅ Auth context (8 tests)
@@ -328,7 +328,7 @@ None currently blocking.
 - [ ] Integration tests (create link → redirect → analytics)
 - [ ] Full end-to-end deployed edge function + webhook monitor
 
-**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 312 tests across 25 files
+**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 323 tests across 27 files
 
 ---
 
@@ -346,7 +346,7 @@ None currently blocking.
 - [ ] Web Workers for analytics processing
 - [ ] Service Worker for offline caching
 - [ ] Database query optimization (query planner analysis)
-- [ ] Add Redis for hot link cache
+- [x] Add Redis for hot link cache
 
 ---
 
@@ -438,7 +438,7 @@ None identified.
 - [x] Bypass URL support
 
 ### V1.0 (Next Phase)
-- [x] >80% test coverage ✅ (2026-03-17: 312 tests across 25 files)
+- [x] >80% test coverage ✅ (2026-03-17: 323 tests across 27 files)
 - [x] Component tests added ✅ (2026-03-16: 51 component tests)
 - [x] Hook tests added ✅ (2026-03-16: 50+ hook tests)
 - [x] Page component tests ✅ (2026-03-16: 30+ page tests)
