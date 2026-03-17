@@ -32,6 +32,12 @@ dist-ssr
 # Generated outputs (may contain secrets)
 repomix-output.*
 
+# Local agent runtime state
+.claude/metadata.json
+.claude/hooks/.logs/
+.claude/session-state/
+plans/antigravity-bridge/
+
 # Test artifacts
 coverage/
 test-results/
