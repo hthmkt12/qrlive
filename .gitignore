@@ -28,3 +28,11 @@ dist-ssr
 .env.*
 !.env.example
 .claude/settings.local.json
+
+# Generated outputs (may contain secrets)
+repomix-output.*
+
+# Test artifacts
+coverage/
+test-results/
+playwright-report/
