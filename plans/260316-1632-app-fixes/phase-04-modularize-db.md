@@ -20,14 +20,14 @@ src/lib/
 Keeping `src/lib/db.ts` as a barrel ensures zero breaking changes for all existing imports.
 
 ## Todo
-- [ ] Read full `src/lib/db.ts` to map all exports
-- [ ] Create `src/lib/db/models.ts` — move interfaces/types
-- [ ] Create `src/lib/db/queries.ts` — move fetch functions
-- [ ] Create `src/lib/db/mutations.ts` — move CRUD + generateShortCode
-- [ ] Create `src/lib/db/utils.ts` — move getRedirectUrl + normalizeAnalyticsRows
-- [ ] Rewrite `src/lib/db.ts` as re-export barrel
-- [ ] Run `npm run typecheck` → 0 errors
-- [ ] Run `npm run test -- --run` → all pass
+- [x] Read full `src/lib/db.ts` to map all exports
+- [x] Create `src/lib/db/models.ts` — move interfaces/types
+- [x] Create `src/lib/db/queries.ts` — move fetch functions
+- [x] Create `src/lib/db/mutations.ts` — move CRUD + generateShortCode
+- [x] Create `src/lib/db/utils.ts` — move getRedirectUrl + normalizeAnalyticsRows
+- [x] Rewrite `src/lib/db.ts` as re-export barrel
+- [x] Run `npm run typecheck` → 0 errors
+- [x] Run `npm run test -- --run` → all pass
 
 ## Files Modified
 - `src/lib/db.ts` — convert to barrel

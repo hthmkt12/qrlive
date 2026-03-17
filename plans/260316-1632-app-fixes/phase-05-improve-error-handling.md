@@ -20,11 +20,11 @@ Read and verify:
 - Generic network errors → toast with retry suggestion
 
 ## Todo
-- [ ] Re-read `src/components/EditLinkDialog.tsx` after Phase 03 changes
-- [ ] Verify EditLinkDialog handles: SHORT_CODE_TAKEN, network failure, unknown
-- [ ] Read `src/components/CreateLinkDialog.tsx` — verify error handling complete
-- [ ] Ensure consistent error UX between Create and Edit dialogs
-- [ ] Run `npm run test -- --run` → all pass
+- [x] Re-read `src/components/EditLinkDialog.tsx` after Phase 03 changes
+- [x] Verify EditLinkDialog handles: SHORT_CODE_TAKEN, network failure, unknown
+- [x] Read `src/components/CreateLinkDialog.tsx` — verify error handling complete
+- [x] Ensure consistent error UX between Create and Edit dialogs
+- [x] Run `npm run test -- --run` → all pass
 
 ## Success Criteria
 - Edit and Create dialogs show same quality of error messages

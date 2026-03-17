@@ -92,27 +92,27 @@ No RLS changes needed -- column inherits existing owner-only policies.
 
 ## Todo List
 
-- [ ] 1.1 Create DB migration
-- [ ] 1.2 Update `models.ts` with `expires_at` field
-- [ ] 1.3 Update `schemas.ts` with `expiresAt` validation
-- [ ] 1.4 Update `mutations.ts` to accept/pass `expires_at`
-- [ ] 1.5 Update `use-link-mutations.ts` mutation params
-- [ ] 1.6 Add DatePicker to `CreateLinkDialog.tsx`
-- [ ] 1.7 Add DatePicker to `EditLinkDialog.tsx`
-- [ ] 1.8 Add expired badge to `LinkCard.tsx`
-- [ ] 1.9 Update edge function redirect query
-- [ ] 1.10 Regenerate Supabase types
-- [ ] 1.11 Write schema tests for expiresAt
-- [ ] 1.12 Run typecheck and lint
+- [x] 1.1 Create DB migration
+- [x] 1.2 Update `models.ts` with `expires_at` field
+- [x] 1.3 Update `schemas.ts` with `expiresAt` validation
+- [x] 1.4 Update `mutations.ts` to accept/pass `expires_at`
+- [x] 1.5 Update `use-link-mutations.ts` mutation params
+- [x] 1.6 Add DatePicker to `CreateLinkDialog.tsx`
+- [x] 1.7 Add DatePicker to `EditLinkDialog.tsx`
+- [x] 1.8 Add expired badge to `LinkCard.tsx`
+- [x] 1.9 Update edge function redirect query
+- [x] 1.10 Regenerate Supabase types
+- [x] 1.11 Write schema tests for expiresAt
+- [x] 1.12 Run typecheck and lint
 
 ## Success Criteria
 
-- [ ] Link with past `expires_at` returns 404 on redirect
-- [ ] Link with future `expires_at` redirects normally
-- [ ] Link with NULL `expires_at` redirects normally (backward compatible)
-- [ ] Dashboard shows expired badge
-- [ ] User can set/clear/change expiration in Create and Edit dialogs
-- [ ] All existing tests pass
+- [x] Link with past `expires_at` returns 404 on redirect
+- [x] Link with future `expires_at` redirects normally
+- [x] Link with NULL `expires_at` redirects normally (backward compatible)
+- [x] Dashboard shows expired badge
+- [x] User can set/clear/change expiration in Create and Edit dialogs
+- [x] All existing tests pass
 
 ## Risk Assessment
 

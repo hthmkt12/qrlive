@@ -117,25 +117,25 @@ grant execute on function public.get_link_click_detail_v2(uuid, date, date) to a
 
 ## Todo List
 
-- [ ] 3.1 Create DB migration with `get_link_click_detail_v2`
-- [ ] 3.2 Add `fetchLinkAnalyticsDetailV2` to `queries.ts`
-- [ ] 3.3 Update `query-keys.ts` with date params
-- [ ] 3.4 Update `useLinkAnalyticsDetail` hook
-- [ ] 3.5 Create `analytics-date-range-picker.tsx`
-- [ ] 3.6 Update `StatsPanel.tsx` with date range selector
-- [ ] 3.7 Write tests
-- [ ] 3.8 Run typecheck and lint
+- [x] 3.1 Create DB migration with `get_link_click_detail_v2`
+- [x] 3.2 Add `fetchLinkAnalyticsDetailV2` to `queries.ts`
+- [x] 3.3 Update `query-keys.ts` with date params
+- [x] 3.4 Update `useLinkAnalyticsDetail` hook
+- [x] 3.5 Create `analytics-date-range-picker.tsx`
+- [x] 3.6 Update `StatsPanel.tsx` with date range selector
+- [x] 3.7 Write tests
+- [x] 3.8 Run typecheck and lint
 
 ## Success Criteria
 
-- [ ] Default view shows 7-day data (same as current behavior)
-- [ ] Selecting 30d/90d shows expanded date range
-- [ ] Custom date range works with Calendar picker
-- [ ] Bar chart groups by week for ranges >30 days
-- [ ] Country and referer breakdowns filter by selected range
-- [ ] Summary cards remain all-time (not filtered by range)
-- [ ] Cache keys separate per date range (no stale data)
-- [ ] All existing tests pass
+- [x] Default view shows 7-day data (same as current behavior)
+- [x] Selecting 30d/90d shows expanded date range
+- [x] Custom date range works with Calendar picker
+- [x] Bar chart groups by week for ranges >30 days
+- [x] Country and referer breakdowns filter by selected range
+- [x] Summary cards remain all-time (not filtered by range)
+- [x] Cache keys separate per date range (no stale data)
+- [x] All existing tests pass
 
 ## Risk Assessment
 

@@ -1,3 +1,32 @@
+---
+title: "QRLive App Fixes Plan"
+status: completed
+priority: P1
+effort: medium
+branch: master
+created: 2026-03-16
+---
+
+<!-- plan-status-sync:start -->
+## Plan Status Sync
+
+- Last synced: 2026-03-17 20:15
+- Progress: 100%
+- Derived status: completed
+
+| Phase | Status | Progress | File |
+| --- | --- | --- | --- |
+| Phase 01 — Fix Failing Test | completed | 100% | `phase-01-fix-failing-test.md` |
+| Phase 02 — Fix Lint Errors | completed | 100% | `phase-02-fix-lint-errors.md` |
+| Phase 03 — Security Fixes | completed | 100% | `phase-03-security-fixes.md` |
+| Phase 04 — Modularize db.ts | completed | 100% | `phase-04-modularize-db.md` |
+| Phase 05 — Improve Error Handling | completed | 100% | `phase-05-improve-error-handling.md` |
+| Phase 06 — Add Mutation Hook Tests | completed | 100% | `phase-06-add-mutation-tests.md` |
+
+Malformed active plan dirs:
+- `260317-prod-readiness` - missing plan.md
+<!-- plan-status-sync:end -->
+
 # QRLive App Fixes Plan
 **Date:** 2026-03-16 | **Branch:** master | **Status:** ✅ Completed (2026-03-16)
 

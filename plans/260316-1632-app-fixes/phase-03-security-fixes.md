@@ -67,13 +67,13 @@ catch (e) {
 ```
 
 ## Todo
-- [ ] Read `src/lib/db.ts` around line 144 to verify current code
-- [ ] Fix short code generation to use `crypto.randomUUID()`
-- [ ] Read `src/pages/Auth.tsx` to understand signin/signup error flows
-- [ ] Normalize auth error messages (distinguish signin vs signup where needed)
-- [ ] Read `src/components/EditLinkDialog.tsx:63-81`
-- [ ] Add SHORT_CODE_TAKEN error handling
-- [ ] Run `npm run test -- --run` to confirm no regressions
+- [x] Read `src/lib/db.ts` around line 144 to verify current code
+- [x] Fix short code generation to use `crypto.randomUUID()`
+- [x] Read `src/pages/Auth.tsx` to understand signin/signup error flows
+- [x] Normalize auth error messages (distinguish signin vs signup where needed)
+- [x] Read `src/components/EditLinkDialog.tsx:63-81`
+- [x] Add SHORT_CODE_TAKEN error handling
+- [x] Run `npm run test -- --run` to confirm no regressions
 
 ## Success Criteria
 - Short code generation uses crypto API

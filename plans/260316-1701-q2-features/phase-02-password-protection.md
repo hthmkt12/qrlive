@@ -115,30 +115,30 @@ No RLS changes needed -- columns inherit existing owner-only policies.
 
 ## Todo List
 
-- [ ] 2.1 Create DB migration
-- [ ] 2.2 Create `src/lib/password-utils.ts`
-- [ ] 2.3 Update `models.ts`
-- [ ] 2.4 Update `schemas.ts` with password validation
-- [ ] 2.5 Update `mutations.ts` for password hashing
-- [ ] 2.6 Update `use-link-mutations.ts`
-- [ ] 2.7 Add password input to `CreateLinkDialog.tsx`
-- [ ] 2.8 Add password input to `EditLinkDialog.tsx`
-- [ ] 2.9 Add lock icon to `LinkCard.tsx`
-- [ ] 2.10 Update edge function: GET serves form, POST verifies
-- [ ] 2.11 Regenerate Supabase types
-- [ ] 2.12 Write tests for password utils and schema
-- [ ] 2.13 Run typecheck and lint
+- [x] 2.1 Create DB migration
+- [x] 2.2 Create `src/lib/password-utils.ts`
+- [x] 2.3 Update `models.ts`
+- [x] 2.4 Update `schemas.ts` with password validation
+- [x] 2.5 Update `mutations.ts` for password hashing
+- [x] 2.6 Update `use-link-mutations.ts`
+- [x] 2.7 Add password input to `CreateLinkDialog.tsx`
+- [x] 2.8 Add password input to `EditLinkDialog.tsx`
+- [x] 2.9 Add lock icon to `LinkCard.tsx`
+- [x] 2.10 Update edge function: GET serves form, POST verifies
+- [x] 2.11 Regenerate Supabase types
+- [x] 2.12 Write tests for password utils and schema
+- [x] 2.13 Run typecheck and lint
 
 ## Success Criteria
 
-- [ ] Protected link GET returns HTML password form
-- [ ] Correct password redirects with 302
-- [ ] Wrong password re-shows form with Vietnamese error
-- [ ] Unprotected links redirect as before (backward compatible)
-- [ ] Password hash never exposed in responses or frontend
-- [ ] Dashboard shows lock icon on protected links
-- [ ] User can set/clear password in Create and Edit dialogs
-- [ ] All existing tests pass
+- [x] Protected link GET returns HTML password form
+- [x] Correct password redirects with 302
+- [x] Wrong password re-shows form with Vietnamese error
+- [x] Unprotected links redirect as before (backward compatible)
+- [x] Password hash never exposed in responses or frontend
+- [x] Dashboard shows lock icon on protected links
+- [x] User can set/clear password in Create and Edit dialogs
+- [x] All existing tests pass
 
 ## Risk Assessment
 

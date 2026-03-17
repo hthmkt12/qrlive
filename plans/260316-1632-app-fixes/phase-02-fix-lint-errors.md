@@ -25,13 +25,13 @@ interface CommandProps extends ... {}
 Need to read those lines first to determine the correct type replacement.
 
 ## Todo
-- [ ] Read `src/components/ui/command.tsx` around line 24
-- [ ] Read `src/components/ui/textarea.tsx` around line 5
-- [ ] Fix `no-empty-object-type` (eslint-disable comment preferred for shadcn)
-- [ ] Read `src/test/link-card.test.tsx:32`
-- [ ] Read `src/test/qr-preview.test.tsx:16`
-- [ ] Fix `no-explicit-any` with correct types
-- [ ] Run `npm run lint` → 0 errors
+- [x] Read `src/components/ui/command.tsx` around line 24
+- [x] Read `src/components/ui/textarea.tsx` around line 5
+- [x] Fix `no-empty-object-type` (eslint-disable comment preferred for shadcn)
+- [x] Read `src/test/link-card.test.tsx:32`
+- [x] Read `src/test/qr-preview.test.tsx:16`
+- [x] Fix `no-explicit-any` with correct types
+- [x] Run `npm run lint` → 0 errors
 
 ## Success Criteria
 `npm run lint` → 0 errors (warnings on shadcn ok)

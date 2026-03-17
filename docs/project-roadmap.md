@@ -9,6 +9,21 @@
 
 ---
 
+<!-- active-plan-sync:start -->
+## Active Plan Sync Snapshot
+
+- Last synced: 2026-03-17 20:15
+
+| Plan | Status | Progress | Notes |
+| --- | --- | --- | --- |
+| Japan Reverse Proxy Server for GFW Bypass | in-progress | 40% | plan.md updated |
+| QRLive App Fixes Plan | completed | 100% | rollout backfill, plan.md updated |
+| QRLive Q2 2026 Features | completed | 100% | rollout backfill, plan.md updated |
+
+Malformed active plan dirs:
+- `260317-prod-readiness` - missing plan.md
+<!-- active-plan-sync:end -->
+
 ## Project Timeline
 
 ```

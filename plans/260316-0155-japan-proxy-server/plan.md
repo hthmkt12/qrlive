@@ -1,13 +1,30 @@
 ---
 title: "Japan Reverse Proxy Server for GFW Bypass"
 description: "Deploy existing proxy-gateway/ Node.js server to Fly.io Tokyo (nrt) to enable Chinese users to access geo-blocked content via QRLive bypass_url"
-status: completed
+status: in-progress
 priority: P1
 effort: 4h
-branch: n/a (infrastructure-only)
+branch: "n/a (infrastructure-only)"
 tags: [infrastructure, fly.io, proxy-gateway, nodejs, china, gfw]
 created: 2026-03-16
 ---
+
+<!-- plan-status-sync:start -->
+## Plan Status Sync
+
+- Last synced: 2026-03-17 20:15
+- Progress: 40%
+- Derived status: in-progress
+
+| Phase | Status | Progress | File |
+| --- | --- | --- | --- |
+| Deploy proxy-gateway to Fly.io Tokyo | in-progress | 33% | `phase-01-vps-nginx.md` |
+| Supabase Edge Function Proxy (Optional) | pending | 0% | `phase-02-supabase-proxy-edge.md` |
+| Integration Guide & Documentation | completed | 100% | `phase-03-integration-guide.md` |
+
+Malformed active plan dirs:
+- `260317-prod-readiness` - missing plan.md
+<!-- plan-status-sync:end -->
 
 # Japan Reverse Proxy Server
 

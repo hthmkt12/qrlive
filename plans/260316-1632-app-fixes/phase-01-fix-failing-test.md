@@ -21,8 +21,8 @@ Querying `container.querySelectorAll(...)` returns 0 elements → `removeBtn` is
 ```
 
 ## Todo
-- [ ] Apply fix to `src/test/edit-link-dialog.test.tsx:249`
-- [ ] Run `npm run test -- --run` and confirm 129/129 pass
+- [x] Apply fix to `src/test/edit-link-dialog.test.tsx:249`
+- [x] Run `npm run test -- --run` and confirm 129/129 pass
 
 ## Success Criteria
 `npm run test -- --run` → 129 passed, 0 failed

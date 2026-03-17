@@ -11,27 +11,27 @@ Coverage only via component tests (indirect). Direct tests catch regressions ear
 ## Test Cases
 
 ### useCreateLink
-- [ ] Creates link with auto-generated short code
-- [ ] Creates link with custom short code
-- [ ] Handles SHORT_CODE_TAKEN error → re-throws with correct message
-- [ ] Invalidates QUERY_KEYS.links on success
+- [x] Creates link with auto-generated short code
+- [x] Creates link with custom short code
+- [x] Handles SHORT_CODE_TAKEN error → re-throws with correct message
+- [x] Invalidates QUERY_KEYS.links on success
 
 ### useUpdateLink
-- [ ] Updates link name/URL
-- [ ] Invalidates QUERY_KEYS.links on success
+- [x] Updates link name/URL
+- [x] Invalidates QUERY_KEYS.links on success
 
 ### useToggleActive
-- [ ] Optimistically updates UI before server response
-- [ ] Rolls back on error (context.previous restored)
-- [ ] Calls setQueryData with toggled isActive
+- [x] Optimistically updates UI before server response
+- [x] Rolls back on error (context.previous restored)
+- [x] Calls setQueryData with toggled isActive
 
 ### useUpdateGeoRoutes
-- [ ] Calls updateGeoRoutesInDB with correct args
-- [ ] Invalidates cache on success
+- [x] Calls updateGeoRoutesInDB with correct args
+- [x] Invalidates cache on success
 
 ### useDeleteLink
-- [ ] Deletes link by id
-- [ ] Invalidates QUERY_KEYS.links on success
+- [x] Deletes link by id
+- [x] Invalidates QUERY_KEYS.links on success
 
 ## Mocking Strategy
 Follow existing test patterns (vi.hoisted + vi.mock):
@@ -48,10 +48,10 @@ vi.mock('@/lib/db', () => ({
 Use `@testing-library/react` `renderHook` + `QueryClientProvider` wrapper.
 
 ## Todo
-- [ ] Read `src/hooks/use-link-mutations.ts` fully
-- [ ] Read existing hook test patterns (e.g. `src/test/auth-context.test.tsx`) for setup
-- [ ] Create `src/test/use-link-mutations.test.ts` with ~20 tests
-- [ ] Run `npm run test -- --run` → all pass including new tests
+- [x] Read `src/hooks/use-link-mutations.ts` fully
+- [x] Read existing hook test patterns (e.g. `src/test/auth-context.test.tsx`) for setup
+- [x] Create `src/test/use-link-mutations.test.ts` with ~20 tests
+- [x] Run `npm run test -- --run` → all pass including new tests
 
 ## Success Criteria
 - `use-link-mutations` hook has ≥15 direct unit tests
