@@ -2,12 +2,24 @@
 import { LinkAnalyticsDetailRow } from "@/lib/db";
 import { COUNTRIES } from "@/lib/types";
 
+export function sanitizeCSVValue(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+function escapeCSVField(value: string): string {
+  const safeValue = sanitizeCSVValue(value);
+  if (/[",\n\r]/.test(safeValue)) {
+    return `"${safeValue.replace(/"/g, '""')}"`;
+  }
+  return safeValue;
+}
+
 /** Build a CSV string from analytics detail data */
 export function generateAnalyticsCSV(analytics: LinkAnalyticsDetailRow, linkName: string): string {
   const rows: string[] = [];
 
   // Header metadata
-  rows.push(`# Analytics export for: ${linkName}`);
+  rows.push(`# Analytics export for: ${escapeCSVField(linkName)}`);
   rows.push(`# Generated: ${new Date().toLocaleString("vi-VN")}`);
   rows.push(`# Total clicks: ${analytics.total_clicks}`);
   rows.push("");
@@ -26,7 +38,9 @@ export function generateAnalyticsCSV(analytics: LinkAnalyticsDetailRow, linkName
   for (const entry of analytics.country_breakdown) {
     const country = COUNTRIES.find((c) => c.code === entry.country_code);
     const name = country ? country.name : entry.country_code;
-    rows.push(`${entry.country_code},${name},${entry.clicks}`);
+    rows.push(
+      `${escapeCSVField(entry.country_code)},${escapeCSVField(name)},${entry.clicks}`
+    );
   }
   rows.push("");
 
@@ -34,10 +48,7 @@ export function generateAnalyticsCSV(analytics: LinkAnalyticsDetailRow, linkName
   rows.push("=== Nguồn truy cập ===");
   rows.push("Nguồn,Clicks");
   for (const entry of analytics.referer_breakdown) {
-    const referer = entry.referer || "direct";
-    // Escape commas in referer string
-    const escaped = referer.includes(",") ? `"${referer}"` : referer;
-    rows.push(`${escaped},${entry.clicks}`);
+    rows.push(`${escapeCSVField(entry.referer || "direct")},${entry.clicks}`);
   }
 
   return rows.join("\n");

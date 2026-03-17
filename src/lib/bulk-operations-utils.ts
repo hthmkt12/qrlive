@@ -122,11 +122,16 @@ export function groupRowsIntoLinks(rows: CSVRow[]): GroupedLink[] {
 }
 
 /** Escape a CSV field value — wraps in quotes if it contains commas, quotes, or newlines */
+function sanitizeCSVValue(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
 function escapeCSVField(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safeValue = sanitizeCSVValue(value);
+  if (/[",\n\r]/.test(safeValue)) {
+    return `"${safeValue.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safeValue;
 }
 
 /**

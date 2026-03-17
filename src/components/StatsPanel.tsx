@@ -1,28 +1,21 @@
 import { lazy, Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Globe, MousePointerClick, TrendingUp } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { COUNTRIES } from "@/lib/types";
-import { LinkAnalyticsDetailRow, QRLinkRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { QRPreview } from "./QRPreview";
-import { AnalyticsDateRangePicker, DateRange } from "./analytics-date-range-picker";
-import { AnalyticsExportButton } from "./analytics-export-button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLinkAnalyticsDetailV2 } from "@/hooks/use-links";
+import { LinkAnalyticsDetailRow, QRLinkRow } from "@/lib/db";
+import { COUNTRIES } from "@/lib/types";
+import { AnalyticsExportButton } from "./analytics-export-button";
+import { AnalyticsDateRangePicker, DateRange } from "./analytics-date-range-picker";
+import { QRPreview } from "./QRPreview";
 
-// Lazy-load the recharts-heavy visualizations — only fetched when StatsPanel actually renders
 const StatsCharts = lazy(() => import("./StatsCharts"));
 
 interface StatsPanelProps {
   link: QRLinkRow;
-  analytics: LinkAnalyticsDetailRow; // fallback / initial data
+  analytics: LinkAnalyticsDetailRow;
   isLoading?: boolean;
   onBack: () => void;
 }
@@ -39,20 +32,15 @@ function defaultDateRange(): DateRange {
 }
 
 function formatDayLabel(date: string) {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString("vi-VN", {
-    weekday: "short",
-    day: "numeric",
-  });
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("vi-VN", { weekday: "short", day: "numeric" });
 }
 
-/** Aggregate daily clicks into weekly buckets for ranges > 30 days */
-function aggregateWeekly(days: LinkAnalyticsDetailRow["clicks_by_day"]) {
+export function aggregateWeekly(days: LinkAnalyticsDetailRow["clicks_by_day"]) {
+  if (days.length === 0) return [];
   const weeks: { date: string; clicks: number }[] = [];
-  for (let i = 0; i < days.length; i += 7) {
-    const slice = days.slice(i, i + 7);
-    const label = formatDayLabel(slice[0].date);
-    const clicks = slice.reduce((sum, d) => sum + d.clicks, 0);
-    weeks.push({ date: label, clicks });
+  for (let index = 0; index < days.length; index += 7) {
+    const slice = days.slice(index, index + 7);
+    weeks.push({ date: formatDayLabel(slice[0].date), clicks: slice.reduce((sum, day) => sum + day.clicks, 0) });
   }
   return weeks;
 }
@@ -62,76 +50,45 @@ function rangeDays(range: DateRange): number {
   return Math.round(ms / 86_400_000) + 1;
 }
 
-/** Filter analytics to a single country — country_breakdown and referer_breakdown
- *  are already country-scoped from the RPC. For frontend filtering we reduce
- *  country_breakdown to just the selected entry and narrow referer_breakdown
- *  proportionally (best-effort since the RPC doesn't split referers per country). */
-function filterAnalyticsByCountry(
-  analytics: LinkAnalyticsDetailRow,
-  countryCode: string
-): LinkAnalyticsDetailRow {
+function filterAnalyticsByCountry(analytics: LinkAnalyticsDetailRow, countryCode: string): LinkAnalyticsDetailRow {
   if (countryCode === "all") return analytics;
-
-  const countryEntry = analytics.country_breakdown.find(
-    (e) => e.country_code === countryCode
-  );
+  const countryEntry = analytics.country_breakdown.find((entry) => entry.country_code === countryCode);
   const filteredClicks = countryEntry?.clicks ?? 0;
   const ratio = analytics.total_clicks > 0 ? filteredClicks / analytics.total_clicks : 0;
-
   return {
     ...analytics,
     total_clicks: filteredClicks,
     country_breakdown: countryEntry ? [countryEntry] : [],
-    // Scale referer clicks proportionally (best-effort without per-country referer data)
-    referer_breakdown: analytics.referer_breakdown.map((r) => ({
-      ...r,
-      clicks: Math.round(r.clicks * ratio),
-    })),
+    referer_breakdown: analytics.referer_breakdown.map((entry) => ({ ...entry, clicks: Math.round(entry.clicks * ratio) })),
   };
 }
 
 export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: externalLoading = false, onBack }: StatsPanelProps) {
   const [dateRange, setDateRange] = useState<DateRange>(defaultDateRange);
-  const [selectedCountry, setSelectedCountry] = useState<string>("all");
-
-  const { data: rangedAnalytics, isLoading: rangedLoading } = useLinkAnalyticsDetailV2(
-    link.id,
-    dateRange.startDate,
-    dateRange.endDate
-  );
-
+  const [selectedCountry, setSelectedCountry] = useState("all");
+  const { data: rangedAnalytics, isLoading: rangedLoading } = useLinkAnalyticsDetailV2(link.id, dateRange.startDate, dateRange.endDate);
   const rawAnalytics = rangedAnalytics ?? fallbackAnalytics;
   const analytics = filterAnalyticsByCountry(rawAnalytics, selectedCountry);
   const isLoading = externalLoading || rangedLoading;
   const days = rangeDays(dateRange);
-
   const chartData = days > 30
     ? aggregateWeekly(rawAnalytics.clicks_by_day)
     : rawAnalytics.clicks_by_day.map((entry) => ({ date: formatDayLabel(entry.date), clicks: entry.clicks }));
-
   const chartTitle = days <= 7 ? "Clicks 7 ngày qua" : days <= 30 ? `Clicks ${days} ngày qua` : `Clicks ${days} ngày (theo tuần)`;
-
-  const totalClicks = analytics.total_clicks;
-
-  // Countries present in current analytics data for the filter dropdown
-  const availableCountries = rawAnalytics.country_breakdown.map((e) => {
-    const country = COUNTRIES.find((c) => c.code === e.country_code);
-    return {
-      code: e.country_code,
-      label: country ? `${country.flag} ${country.name}` : e.country_code,
-    };
+  const availableCountries = rawAnalytics.country_breakdown.map((entry) => {
+    const country = COUNTRIES.find((item) => item.code === entry.country_code);
+    return { code: entry.country_code, label: country ? `${country.flag} ${country.name}` : entry.country_code };
   });
 
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
       <Button variant="ghost" onClick={onBack} className="mb-2">
-        <ArrowLeft className="h-4 w-4 mr-2" /> Quay lại
+        <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại
       </Button>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <QRPreview url={link.default_url} shortCode={link.short_code} name={link.name} />
-
           {link.geo_routes?.length > 0 && (
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
               <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
@@ -154,11 +111,10 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
         </div>
 
         <div className="space-y-6 lg:col-span-2">
-          {/* Summary cards — filtered by selected country when active */}
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-xl border border-border bg-card p-4">
               <MousePointerClick className="mb-2 h-5 w-5 text-primary" />
-              <p className="text-2xl font-bold">{isLoading ? "..." : totalClicks}</p>
+              <p className="text-2xl font-bold">{isLoading ? "..." : analytics.total_clicks}</p>
               <p className="text-xs text-muted-foreground">Tổng clicks</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
@@ -173,42 +129,28 @@ export function StatsPanel({ link, analytics: fallbackAnalytics, isLoading: exte
             </div>
           </div>
 
-          {/* Controls row — date range picker + country filter + export */}
           <div className="flex flex-wrap items-center gap-2">
             <AnalyticsDateRangePicker value={dateRange} onChange={setDateRange} />
-
             <div className="ml-auto flex items-center gap-2">
-              {/* Country filter dropdown */}
               <Select value={selectedCountry} onValueChange={setSelectedCountry}>
                 <SelectTrigger className="h-8 w-[160px] text-sm" aria-label="Lọc theo quốc gia">
                   <SelectValue placeholder="Tất cả quốc gia" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả quốc gia</SelectItem>
-                  {availableCountries.map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
+                  {availableCountries.map((country) => <SelectItem key={country.code} value={country.code}>{country.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-
-              {/* Export button */}
-              <AnalyticsExportButton
-                analytics={analytics}
-                linkName={link.name}
-                shortCode={link.short_code}
-              />
+              <AnalyticsExportButton analytics={analytics} linkName={link.name} shortCode={link.short_code} />
             </div>
           </div>
 
-          {/* Lazy-loaded recharts visualizations */}
           <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
             <StatsCharts
               chartData={chartData}
               chartTitle={chartTitle}
               analytics={analytics}
-              totalClicks={totalClicks}
+              totalClicks={analytics.total_clicks}
               selectedCountry={selectedCountry}
             />
           </Suspense>

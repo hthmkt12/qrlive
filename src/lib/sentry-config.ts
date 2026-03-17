@@ -14,7 +14,7 @@ export function initSentry() {
     environment: import.meta.env.MODE,
     integrations: [
       Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+      Sentry.replayIntegration({ maskAllInputs: true, blockAllMedia: false }),
     ],
     // Lower sample rate in production to control volume/cost
     tracesSampleRate: import.meta.env.PROD ? 0.2 : 1.0,

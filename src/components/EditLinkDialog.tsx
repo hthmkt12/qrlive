@@ -1,17 +1,17 @@
-import { useEffect, useRef } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Globe, Lock, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Globe, Trash2, Save, Lock } from "lucide-react";
-import { COUNTRIES } from "@/lib/types";
-import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
+import { useToast } from "@/hooks/use-toast";
+import { useUpdateGeoRoutes, useUpdateLink } from "@/hooks/use-link-mutations";
 import { QRLinkRow } from "@/lib/db";
 import type { QrConfig } from "@/lib/db/models";
-import { useToast } from "@/hooks/use-toast";
-import { useUpdateLink, useUpdateGeoRoutes } from "@/hooks/use-link-mutations";
+import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
+import { COUNTRIES } from "@/lib/types";
 
 interface EditLinkDialogProps {
   link: QRLinkRow | null;
@@ -23,9 +23,8 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
   const { toast } = useToast();
   const updateLink = useUpdateLink();
   const updateGeoRoutes = useUpdateGeoRoutes();
-  // Track QR config changes from QRPreview; initialized from link.qr_config when link changes
   const qrConfigRef = useRef<QrConfig | null>(null);
-
+  const [clearPassword, setClearPassword] = useState(false);
   const {
     register,
     control,
@@ -38,71 +37,60 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
     resolver: zodResolver(linkFormSchema),
     defaultValues: { name: "", defaultUrl: "", geoRoutes: [] },
   });
-
   const { fields, append, remove } = useFieldArray({ control, name: "geoRoutes" });
+  const passwordField = register("linkPassword");
 
-  // Populate form when a link is selected for editing
   useEffect(() => {
-    if (link) {
-      // Convert ISO timestamp to YYYY-MM-DD for <input type="date">
-      const expiresAt = link.expires_at ? link.expires_at.substring(0, 10) : "";
-      reset({
-        name: link.name,
-        defaultUrl: link.default_url,
-        expiresAt,
-        linkPassword: "",
-        geoRoutes: (link.geo_routes || []).map((r) => ({
-          country: r.country,
-          countryCode: r.country_code,
-          targetUrl: r.target_url,
-          bypassUrl: r.bypass_url || "",
-        })),
-      });
-      // Initialize QR config ref from saved link config
-      qrConfigRef.current = link.qr_config ?? null;
-    }
-  }, [link, reset]);
+    if (!link || !open) return;
+    reset({
+      name: link.name,
+      defaultUrl: link.default_url,
+      expiresAt: link.expires_at ? link.expires_at.substring(0, 10) : "",
+      linkPassword: undefined,
+      geoRoutes: (link.geo_routes || []).map((route) => ({
+        country: route.country,
+        countryCode: route.country_code,
+        targetUrl: route.target_url,
+        bypassUrl: route.bypass_url || "",
+      })),
+    });
+    qrConfigRef.current = link.qr_config ?? null;
+    setClearPassword(false);
+  }, [link, open, reset]);
+
+  if (!link) return null;
 
   const handleCountryChange = (index: number, code: string) => {
-    const country = COUNTRIES.find((c) => c.code === code);
+    const country = COUNTRIES.find((item) => item.code === code);
     setValue(`geoRoutes.${index}.countryCode`, code);
     setValue(`geoRoutes.${index}.country`, country?.name || "");
   };
 
   const onSubmit = async (data: LinkFormInput) => {
-    if (!link) return;
     try {
-      // Convert YYYY-MM-DD to end-of-day ISO string, or null to clear expiration
       const expires_at = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59`).toISOString() : null;
-      // Pass linkPassword through: "" clears existing password; non-empty sets new; undefined = no change
-      // Note: empty string is intentional — it signals "clear the password"
+      const nextPassword = data.linkPassword?.trim() ?? "";
       await updateLink.mutateAsync({
         id: link.id,
         updates: { name: data.name, default_url: data.defaultUrl, expires_at, qr_config: qrConfigRef.current },
-        password: data.linkPassword,
+        password: clearPassword ? "" : nextPassword || undefined,
       });
       await updateGeoRoutes.mutateAsync({
         linkId: link.id,
-        geoRoutes: data.geoRoutes.map((r) => ({
-          country: r.country,
-          countryCode: r.countryCode,
-          targetUrl: r.targetUrl,
-          bypassUrl: r.bypassUrl || undefined,
+        geoRoutes: data.geoRoutes.map((route) => ({
+          country: route.country,
+          countryCode: route.countryCode,
+          targetUrl: route.targetUrl,
+          bypassUrl: route.bypassUrl || undefined,
         })),
       });
       onOpenChange(false);
-      toast({ title: "Đã cập nhật thành công! ✅" });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      toast({
-        title: "Lỗi cập nhật",
-        description: msg || "Vui lòng thử lại",
-        variant: "destructive",
-      });
+      toast({ title: "Đã cập nhật thành công! ✨" });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "";
+      toast({ title: "Lỗi cập nhật", description: description || "Vui lòng thử lại", variant: "destructive" });
     }
   };
-
-  if (!link) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,115 +100,103 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
           <DialogDescription>Cập nhật thông tin, mật khẩu hoặc chuyển hướng theo quốc gia.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-          {/* Name */}
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
           <div className="space-y-1">
             <Label>Tên link</Label>
             <Input {...register("name")} />
             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
 
-          {/* Default URL */}
           <div className="space-y-1">
             <Label>URL mặc định</Label>
             <Input {...register("defaultUrl")} />
             {errors.defaultUrl && <p className="text-xs text-destructive">{errors.defaultUrl.message}</p>}
           </div>
 
-          {/* Expiration date — optional */}
           <div className="space-y-1">
-            <Label>Ngày hết hạn <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span></Label>
+            <Label>Ngày hết hạn <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span></Label>
             <Input type="date" {...register("expiresAt")} />
           </div>
 
-          {/* Password protection — optional */}
           <div className="space-y-1">
             <Label className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-muted-foreground" />
               Mật khẩu bảo vệ
-              <span className="text-xs text-muted-foreground font-normal">(tùy chọn)</span>
+              <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span>
             </Label>
             <Input
               type="password"
-              placeholder={link.has_password ? "••••••••  (nhập mật khẩu mới hoặc để trống để xóa)" : "Để trống nếu không cần mật khẩu"}
-              {...register("linkPassword")}
+              placeholder={link.has_password ? "Nhập mật khẩu mới nếu muốn thay đổi" : "Để trống nếu không cần mật khẩu"}
+              {...passwordField}
+              onChange={(event) => {
+                setClearPassword(false);
+                passwordField.onChange(event);
+              }}
             />
             {link.has_password && (
-              <p className="text-xs text-muted-foreground">
-                Link đang được bảo vệ bằng mật khẩu. Để trống để xóa mật khẩu.
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {clearPassword ? "Mật khẩu hiện tại sẽ được xóa khi lưu." : "Để trống nếu không muốn thay đổi mật khẩu."}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setClearPassword(true);
+                    setValue("linkPassword", "", { shouldDirty: true, shouldTouch: true });
+                  }}
+                >
+                  Xóa mật khẩu hiện tại
+                </Button>
+              </div>
             )}
-            {errors.linkPassword && (
-              <p className="text-xs text-destructive">{errors.linkPassword.message}</p>
-            )}
+            {errors.linkPassword && <p className="text-xs text-destructive">{errors.linkPassword.message}</p>}
           </div>
 
-          {/* Geo routes */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2 flex items-center justify-between">
               <Label className="flex items-center gap-2">
                 <Globe className="h-4 w-4 text-primary" />
                 Chuyển hướng theo quốc gia
               </Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => append({ country: "", countryCode: "", targetUrl: "" })}
-              >
-                <Plus className="h-3 w-3 mr-1" /> Thêm
+              <Button type="button" variant="ghost" size="sm" onClick={() => append({ country: "", countryCode: "", targetUrl: "" })}>
+                <Plus className="mr-1 h-3 w-3" /> Thêm
               </Button>
             </div>
 
-            {fields.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Thêm rule để chuyển hướng người dùng theo IP/quốc gia.
-              </p>
-            )}
+            {fields.length === 0 && <p className="text-xs text-muted-foreground">Thêm rule để chuyển hướng người dùng theo IP/quốc gia.</p>}
 
-            {fields.map((field, i) => (
-              <div key={field.id} className="space-y-1 mb-3">
-                <div className="flex gap-2 items-center">
+            {fields.map((field, index) => (
+              <div key={field.id} className="mb-3 space-y-1">
+                <div className="flex items-center gap-2">
                   <select
-                    value={watch(`geoRoutes.${i}.countryCode`)}
-                    onChange={(e) => handleCountryChange(i, e.target.value)}
-                    className="h-9 rounded-md border border-border bg-secondary px-3 text-sm flex-shrink-0"
+                    value={watch(`geoRoutes.${index}.countryCode`)}
+                    onChange={(event) => handleCountryChange(index, event.target.value)}
+                    className="h-9 flex-shrink-0 rounded-md border border-border bg-secondary px-3 text-sm"
                   >
                     <option value="">Chọn quốc gia</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-                    ))}
+                    {COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name}</option>)}
                   </select>
-                  <Input
-                    placeholder="URL đích"
-                    {...register(`geoRoutes.${i}.targetUrl`)}
-                    className="flex-1"
-                  />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)}>
+                  <Input placeholder="URL đích" {...register(`geoRoutes.${index}.targetUrl`)} className="flex-1" />
+                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
-                {/* Bypass URL — used when the target URL is blocked in this country */}
                 <Input
-                  placeholder="Bypass URL (nếu bị chặn) — ví dụ: https://translate.google.com/translate?u=..."
-                  {...register(`geoRoutes.${i}.bypassUrl`)}
-                  className="text-xs h-8 text-muted-foreground"
+                  placeholder="Bypass URL (nếu bị chặn) - ví dụ: https://translate.google.com/translate?u=..."
+                  {...register(`geoRoutes.${index}.bypassUrl`)}
+                  className="h-8 text-xs text-muted-foreground"
                 />
-                {errors.geoRoutes?.[i]?.countryCode && (
-                  <p className="text-xs text-destructive">{errors.geoRoutes[i]?.countryCode?.message}</p>
-                )}
-                {errors.geoRoutes?.[i]?.targetUrl && (
-                  <p className="text-xs text-destructive">{errors.geoRoutes[i]?.targetUrl?.message}</p>
-                )}
-                {errors.geoRoutes?.[i]?.bypassUrl && (
-                  <p className="text-xs text-destructive">{errors.geoRoutes[i]?.bypassUrl?.message}</p>
-                )}
+                {errors.geoRoutes?.[index]?.countryCode && <p className="text-xs text-destructive">{errors.geoRoutes[index]?.countryCode?.message}</p>}
+                {errors.geoRoutes?.[index]?.targetUrl && <p className="text-xs text-destructive">{errors.geoRoutes[index]?.targetUrl?.message}</p>}
+                {errors.geoRoutes?.[index]?.bypassUrl && <p className="text-xs text-destructive">{errors.geoRoutes[index]?.bypassUrl?.message}</p>}
               </div>
             ))}
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="w-full gradient-primary font-semibold">
-            <Save className="h-4 w-4 mr-2" />
+          <Button type="submit" disabled={isSubmitting} className="w-full font-semibold gradient-primary">
+            <Save className="mr-2 h-4 w-4" />
             {isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
           </Button>
         </form>

@@ -1,4 +1,3 @@
-// Dialog for bulk importing links from a CSV file — upload, preview, validate, import
 import { useRef, useState, useCallback } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,15 +14,17 @@ import { parseCSV, validateCSVRows, groupRowsIntoLinks } from "@/lib/bulk-operat
 import type { CSVRow } from "@/lib/bulk-operations-schemas";
 import { useBulkCreateLinks } from "@/hooks/use-link-mutations";
 import { BulkImportPreviewTable } from "@/components/bulk-import-preview-table";
+import { useToast } from "@/hooks/use-toast";
 
 type ImportPhase = "idle" | "preview" | "importing" | "done";
-
+const MAX_CSV_FILE_SIZE_BYTES = 1024 * 1024;
+const MAX_CSV_ROWS = 500;
 interface RowError { row: number; errors: string[] }
-
 interface ImportSummary { succeeded: number; failed: number; errors: Array<{ name: string; error: string }> }
 
 export function BulkImportDialog() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<ImportPhase>("idle");
@@ -50,10 +51,30 @@ export function BulkImportDialog() {
   };
 
   const processFile = useCallback((file: File) => {
+    if (file.size > MAX_CSV_FILE_SIZE_BYTES) {
+      toast({
+        title: "File CSV quá lớn",
+        description: "Vui lòng chọn file nhỏ hơn hoặc bằng 1 MB.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!file.name.endsWith(".csv")) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
+      const rowCount = Math.max(
+        text.split(/\r?\n/).filter((line) => line.trim() !== "").length - 1,
+        0
+      );
+      if (rowCount > MAX_CSV_ROWS) {
+        toast({
+          title: "CSV có quá nhiều dòng",
+          description: "Tối đa 500 dòng dữ liệu để tránh treo trình duyệt.",
+          variant: "destructive",
+        });
+        return;
+      }
       const parsed = parseCSV(text);
       const { valid, errors } = validateCSVRows(parsed);
       setRows(parsed);
@@ -62,7 +83,7 @@ export function BulkImportDialog() {
       setPhase("preview");
     };
     reader.readAsText(file, "utf-8");
-  }, []);
+  }, [toast]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
