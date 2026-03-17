@@ -1,0 +1,567 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: QRLive Edge and Gateway API
+  version: 1.0.0
+  summary: Machine-readable contract for QRLive redirect, gateway, proxy, and webhook surfaces.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  description: |
+    This specification documents the HTTP interfaces maintained in this repository:
+    - Supabase Edge redirect function
+    - Cloudflare Worker redirect gateway
+    - proxy-gateway health endpoint
+    - fallback Supabase content proxy
+    - outbound click.created webhook payload
+
+    Dashboard CRUD and analytics reads are performed through Supabase Auth, PostgREST,
+    and RPC contracts rather than a dedicated REST API owned by this repo.
+servers:
+  - url: https://qrlive.vercel.app
+    description: Documentation placeholder. Individual paths override this with their deployed hosts.
+security: []
+tags:
+  - name: Redirect Edge Function
+    description: Public Supabase edge function used to resolve QR short codes.
+  - name: Redirect Gateway
+    description: Cloudflare Worker entrypoints that proxy public redirect traffic.
+  - name: Proxy Gateway
+    description: Always-on gateway health surface for bypass_url deployments.
+  - name: Fallback Proxy
+    description: Supabase-hosted testing or emergency proxy surface.
+  - name: Webhooks
+    description: Outbound click event notification payloads sent by QRLive.
+paths:
+  /functions/v1/redirect/{shortCode}:
+    servers:
+      - url: https://{project-ref}.supabase.co
+        description: Supabase project hosting the redirect edge function
+        variables:
+          project-ref:
+            default: ybxmpuirarncxmenprzf
+    parameters:
+      - $ref: "#/components/parameters/ShortCode"
+    get:
+      tags: [Redirect Edge Function]
+      operationId: getRedirect
+      summary: Resolve a short code and return a redirect or password challenge
+      description: |
+        Public redirect endpoint. It validates the short code, checks expiration,
+        resolves geo-routing, records analytics for non-bot traffic, and queues
+        click.created webhooks after recorded clicks.
+      responses:
+        "200":
+          $ref: "#/components/responses/PasswordChallengeHtml"
+        "302":
+          $ref: "#/components/responses/RedirectFound"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/RedirectNotFound"
+        "410":
+          $ref: "#/components/responses/ExpiredHtml"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Redirect Edge Function]
+      operationId: postRedirectPassword
+      summary: Submit a password for a protected short code
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PasswordFormRequest"
+      responses:
+        "302":
+          $ref: "#/components/responses/RedirectFound"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "401":
+          $ref: "#/components/responses/WrongPasswordHtml"
+        "404":
+          $ref: "#/components/responses/RedirectNotFound"
+        "410":
+          $ref: "#/components/responses/ExpiredHtml"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    options:
+      tags: [Redirect Edge Function]
+      operationId: optionsRedirect
+      summary: CORS preflight for the redirect edge function
+      responses:
+        "200":
+          $ref: "#/components/responses/CorsPreflight"
+
+  /{shortCode}:
+    servers:
+      - url: https://{worker-host}
+        description: Cloudflare Worker redirect gateway
+        variables:
+          worker-host:
+            default: r.example.com
+    parameters:
+      - $ref: "#/components/parameters/ShortCode"
+    get:
+      tags: [Redirect Gateway]
+      operationId: getGatewayRedirect
+      summary: Proxy a short-code redirect through the Worker root path
+      description: |
+        Accepts GET /CODE and forwards the request to the Supabase redirect edge
+        function while preserving geo headers and client context.
+      responses:
+        "200":
+          $ref: "#/components/responses/PasswordChallengeHtml"
+        "302":
+          $ref: "#/components/responses/RedirectFound"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/RedirectNotFound"
+        "410":
+          $ref: "#/components/responses/ExpiredHtml"
+        "500":
+          $ref: "#/components/responses/WorkerSecretsError"
+    post:
+      tags: [Redirect Gateway]
+      operationId: postGatewayRedirect
+      summary: Forward password-protected link submissions through the Worker root path
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PasswordFormRequest"
+      responses:
+        "302":
+          $ref: "#/components/responses/RedirectFound"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "401":
+          $ref: "#/components/responses/WrongPasswordHtml"
+        "404":
+          $ref: "#/components/responses/RedirectNotFound"
+        "410":
+          $ref: "#/components/responses/ExpiredHtml"
+        "500":
+          $ref: "#/components/responses/WorkerSecretsError"
+    options:
+      tags: [Redirect Gateway]
+      operationId: optionsGatewayRedirect
+      summary: CORS preflight for the Worker root path
+      responses:
+        "200":
+          $ref: "#/components/responses/CorsPreflight"
+
+  /r/{shortCode}:
+    servers:
+      - url: https://{worker-host}
+        description: Cloudflare Worker redirect gateway using the /r prefix
+        variables:
+          worker-host:
+            default: r.example.com
+    parameters:
+      - $ref: "#/components/parameters/ShortCode"
+    get:
+      tags: [Redirect Gateway]
+      operationId: getGatewayRedirectPrefixed
+      summary: Proxy a short-code redirect through the Worker /r path
+      responses:
+        "200":
+          $ref: "#/components/responses/PasswordChallengeHtml"
+        "302":
+          $ref: "#/components/responses/RedirectFound"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/RedirectNotFound"
+        "410":
+          $ref: "#/components/responses/ExpiredHtml"
+        "500":
+          $ref: "#/components/responses/WorkerSecretsError"
+    post:
+      tags: [Redirect Gateway]
+      operationId: postGatewayRedirectPrefixed
+      summary: Forward password-protected link submissions through the Worker /r path
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PasswordFormRequest"
+      responses:
+        "302":
+          $ref: "#/components/responses/RedirectFound"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "401":
+          $ref: "#/components/responses/WrongPasswordHtml"
+        "404":
+          $ref: "#/components/responses/RedirectNotFound"
+        "410":
+          $ref: "#/components/responses/ExpiredHtml"
+        "500":
+          $ref: "#/components/responses/WorkerSecretsError"
+    options:
+      tags: [Redirect Gateway]
+      operationId: optionsGatewayRedirectPrefixed
+      summary: CORS preflight for the Worker /r path
+      responses:
+        "200":
+          $ref: "#/components/responses/CorsPreflight"
+
+  /health:
+    servers:
+      - url: https://{gateway-host}
+        description: Always-on bypass proxy gateway
+        variables:
+          gateway-host:
+            default: jp.example.com
+    get:
+      tags: [Proxy Gateway]
+      operationId: getProxyGatewayHealth
+      summary: Check proxy-gateway health
+      responses:
+        "200":
+          description: Health check payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /functions/v1/proxy:
+    servers:
+      - url: https://{project-ref}.supabase.co
+        description: Supabase fallback content proxy for testing or emergency use
+        variables:
+          project-ref:
+            default: ybxmpuirarncxmenprzf
+    get:
+      tags: [Fallback Proxy]
+      operationId: getFallbackProxy
+      summary: Fetch an allowlisted upstream URL through the fallback proxy
+      description: |
+        This endpoint is fallback or testing only. It requires an Authorization
+        bearer token that matches PROXY_SECRET and only serves hosts listed in
+        PROXY_ALLOWED_HOSTS.
+      security:
+        - ProxyBearerAuth: []
+      parameters:
+        - in: query
+          name: url
+          required: true
+          description: Allowlisted absolute upstream URL to fetch
+          schema:
+            type: string
+            format: uri
+      responses:
+        "200":
+          description: Upstream content streamed back to the caller
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "302":
+          description: Safe upstream redirect passed through to the client
+          headers:
+            Location:
+              $ref: "#/components/headers/LocationHeader"
+        "400":
+          $ref: "#/components/responses/ProxyBadRequest"
+        "401":
+          $ref: "#/components/responses/ProxyUnauthorized"
+        "403":
+          $ref: "#/components/responses/ProxyForbidden"
+        "500":
+          $ref: "#/components/responses/ProxyConfigError"
+        "502":
+          $ref: "#/components/responses/ProxyFailure"
+    options:
+      tags: [Fallback Proxy]
+      operationId: optionsFallbackProxy
+      summary: CORS preflight for the fallback proxy
+      responses:
+        "200":
+          $ref: "#/components/responses/CorsPreflight"
+
+webhooks:
+  clickCreated:
+    post:
+      tags: [Webhooks]
+      operationId: clickCreatedWebhook
+      summary: click.created webhook payload sent after a recorded click
+      description: |
+        QRLive sends this webhook only after a click is actually recorded
+        (non-bot traffic and not rate-limited as a duplicate). Any non-2xx
+        response is treated as a delivery failure, but redirects still succeed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClickCreatedEvent"
+      responses:
+        "200":
+          description: Webhook accepted
+        "202":
+          description: Webhook accepted for asynchronous processing
+        "204":
+          description: Webhook accepted without response body
+
+components:
+  securitySchemes:
+    ProxyBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: PROXY_SECRET
+  parameters:
+    ShortCode:
+      in: path
+      name: shortCode
+      required: true
+      description: Auto-generated or custom QR short code
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 20
+        pattern: "^[A-Z0-9_-]{3,20}$"
+        example: SUMMER
+  headers:
+    CorsAllowOrigin:
+      description: CORS origin returned by the service
+      schema:
+        type: string
+        example: "*"
+    LocationHeader:
+      description: Redirect target URL
+      schema:
+        type: string
+        format: uri
+        example: https://example.com/landing
+    CacheControlNoStore:
+      description: Disables proxy or browser caching for redirect responses
+      schema:
+        type: string
+        example: no-store
+    RobotsNoIndex:
+      description: Prevents redirect responses from being indexed
+      schema:
+        type: string
+        example: noindex
+  schemas:
+    JsonErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Invalid short code
+        message:
+          type: string
+          example: Request timed out
+      additionalProperties: false
+    PasswordFormRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 1
+          example: secret123
+      additionalProperties: false
+    HealthResponse:
+      type: object
+      required: [status, proxyMode]
+      properties:
+        status:
+          type: string
+          const: ok
+        proxyMode:
+          type: string
+          example: direct
+        upstreamOrigin:
+          type: string
+          format: uri
+          example: https://www.company.com
+      additionalProperties: false
+    ClickCreatedEvent:
+      type: object
+      required: [event, version, occurred_at, link, destination, click]
+      properties:
+        event:
+          type: string
+          const: click.created
+        version:
+          type: integer
+          const: 1
+        occurred_at:
+          type: string
+          format: date-time
+          example: "2026-03-17T10:00:00.000Z"
+        link:
+          type: object
+          required: [id, name, short_code]
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: 11111111-2222-3333-4444-555555555555
+            name:
+              type: string
+              example: Summer Campaign
+            short_code:
+              type: string
+              example: SUMMER
+          additionalProperties: false
+        destination:
+          type: object
+          required: [default_url, redirect_url, geo_routed]
+          properties:
+            default_url:
+              type: string
+              format: uri
+              example: https://example.com
+            redirect_url:
+              type: string
+              format: uri
+              example: https://example.com/vn
+            geo_routed:
+              type: boolean
+              example: true
+          additionalProperties: false
+        click:
+          type: object
+          required: [country_code, referer]
+          properties:
+            country_code:
+              type: string
+              example: VN
+            referer:
+              type: string
+              example: https://google.com
+          additionalProperties: false
+      additionalProperties: false
+  responses:
+    CorsPreflight:
+      description: Successful CORS preflight response
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/CorsAllowOrigin"
+    PasswordChallengeHtml:
+      description: Password challenge page for protected links
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/CorsAllowOrigin"
+      content:
+        text/html:
+          schema:
+            type: string
+          example: "<!DOCTYPE html><html><body><h1>Link duoc bao ve</h1></body></html>"
+    WrongPasswordHtml:
+      description: Password challenge re-rendered with an error message
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/CorsAllowOrigin"
+      content:
+        text/html:
+          schema:
+            type: string
+          example: "<!DOCTYPE html><html><body><p>Mat khau khong dung. Vui long thu lai.</p></body></html>"
+    ExpiredHtml:
+      description: Expired link page
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/CorsAllowOrigin"
+      content:
+        text/html:
+          schema:
+            type: string
+          example: "<!DOCTYPE html><html><body><h1>Link nay da het han</h1></body></html>"
+    RedirectFound:
+      description: Redirect to the resolved destination
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/CorsAllowOrigin"
+        Location:
+          $ref: "#/components/headers/LocationHeader"
+        Cache-Control:
+          $ref: "#/components/headers/CacheControlNoStore"
+        X-Robots-Tag:
+          $ref: "#/components/headers/RobotsNoIndex"
+    JsonError:
+      description: JSON error payload
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/CorsAllowOrigin"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+    RedirectNotFound:
+      description: Short code missing, inactive, or not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Link not found or inactive
+    InternalError:
+      description: Unexpected redirect function error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Internal server error
+    WorkerSecretsError:
+      description: Worker is misconfigured because required secrets are missing
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: "Missing required secrets: SUPABASE_URL, SUPABASE_ANON_KEY"
+    ProxyBadRequest:
+      description: Invalid or missing upstream URL
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          examples:
+            invalidUrl:
+              value:
+                error: Invalid URL
+    ProxyUnauthorized:
+      description: Missing or invalid PROXY_SECRET bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Unauthorized
+    ProxyForbidden:
+      description: Upstream host or redirect target is not allowlisted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Host not allowed
+    ProxyConfigError:
+      description: Proxy is missing required allowlist configuration
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: PROXY_ALLOWED_HOSTS not configured
+    ProxyFailure:
+      description: Upstream fetch failed or timed out
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Proxy fetch failed
