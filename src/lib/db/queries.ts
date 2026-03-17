@@ -12,7 +12,7 @@ export async function fetchLinks(): Promise<QRLinkRow[]> {
   const { data, error } = await supabase
     .from("qr_links")
     // has_password is a server-side generated column — password_hash is never selected here
-    .select("id, user_id, name, short_code, default_url, is_active, created_at, expires_at, has_password, qr_config, geo_routes(*)")
+    .select("id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, qr_config, geo_routes(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

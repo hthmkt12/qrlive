@@ -55,11 +55,13 @@ const mockLink: QRLinkRow = {
   name: "Test Link",
   short_code: "ABC123",
   default_url: "https://example.com",
+  webhook_url: null,
   is_active: true,
   created_at: "2024-01-01T00:00:00Z",
   expires_at: null,
   geo_routes: [],
   has_password: false,
+  qr_config: null,
 };
 
 beforeEach(() => {
@@ -92,6 +94,7 @@ describe("useCreateLink", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       undefined
     );
   });
@@ -120,7 +123,36 @@ describe("useCreateLink", () => {
       "MYCODE",
       undefined,
       undefined,
+      undefined,
       undefined
+    );
+  });
+
+  it("passes webhookUrl through to createLinkInDB", async () => {
+    const qc = makeQueryClient();
+    mockCreateLinkInDB.mockResolvedValue(mockLink);
+    const { result } = renderHook(() => useCreateLink(), { wrapper: makeWrapper(qc) });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        name: "My Link",
+        defaultUrl: "https://example.com",
+        geoRoutes: [],
+        userId: "user-1",
+        webhookUrl: "https://hooks.example.com/qrlive",
+      });
+    });
+
+    expect(mockCreateLinkInDB).toHaveBeenCalledWith(
+      "My Link",
+      "https://example.com",
+      [],
+      "user-1",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "https://hooks.example.com/qrlive"
     );
   });
 
@@ -192,6 +224,25 @@ describe("useUpdateLink", () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: QUERY_KEYS.links });
+  });
+
+  it("passes webhook_url updates to updateLinkInDB", async () => {
+    const qc = makeQueryClient();
+    mockUpdateLinkInDB.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useUpdateLink(), { wrapper: makeWrapper(qc) });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        id: "link-1",
+        updates: { webhook_url: "https://hooks.example.com/qrlive" },
+      });
+    });
+
+    expect(mockUpdateLinkInDB).toHaveBeenCalledWith(
+      "link-1",
+      { webhook_url: "https://hooks.example.com/qrlive" },
+      undefined
+    );
   });
 });
 

@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Globe, Lock, Plus, Save, Trash2 } from "lucide-react";
+import { Lock, Save } from "lucide-react";
+import { LinkGeoRoutesFields } from "@/components/link-geo-routes-fields";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 import { useUpdateGeoRoutes, useUpdateLink } from "@/hooks/use-link-mutations";
-import { QRLinkRow } from "@/lib/db";
+import { useToast } from "@/hooks/use-toast";
+import type { QRLinkRow } from "@/lib/db";
 import type { QrConfig } from "@/lib/db/models";
-import { linkFormSchema, LinkFormInput } from "@/lib/schemas";
-import { COUNTRIES } from "@/lib/types";
+import { type LinkFormInput, linkFormSchema } from "@/lib/schemas";
 
 interface EditLinkDialogProps {
   link: QRLinkRow | null;
@@ -19,12 +25,22 @@ interface EditLinkDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const EMPTY_FORM: LinkFormInput = {
+  name: "",
+  defaultUrl: "",
+  geoRoutes: [],
+  customShortCode: "",
+  expiresAt: "",
+  linkPassword: undefined,
+  webhookUrl: "",
+};
+
 export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps) {
+  const [clearPassword, setClearPassword] = useState(false);
+  const qrConfigRef = useRef<QrConfig | null>(null);
   const { toast } = useToast();
   const updateLink = useUpdateLink();
   const updateGeoRoutes = useUpdateGeoRoutes();
-  const qrConfigRef = useRef<QrConfig | null>(null);
-  const [clearPassword, setClearPassword] = useState(false);
   const {
     register,
     control,
@@ -35,7 +51,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
     formState: { errors, isSubmitting },
   } = useForm<LinkFormInput>({
     resolver: zodResolver(linkFormSchema),
-    defaultValues: { name: "", defaultUrl: "", geoRoutes: [] },
+    defaultValues: EMPTY_FORM,
   });
   const { fields, append, remove } = useFieldArray({ control, name: "geoRoutes" });
   const passwordField = register("linkPassword");
@@ -47,6 +63,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
       defaultUrl: link.default_url,
       expiresAt: link.expires_at ? link.expires_at.substring(0, 10) : "",
       linkPassword: undefined,
+      webhookUrl: link.webhook_url || "",
       geoRoutes: (link.geo_routes || []).map((route) => ({
         country: route.country,
         countryCode: route.country_code,
@@ -60,19 +77,19 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
 
   if (!link) return null;
 
-  const handleCountryChange = (index: number, code: string) => {
-    const country = COUNTRIES.find((item) => item.code === code);
-    setValue(`geoRoutes.${index}.countryCode`, code);
-    setValue(`geoRoutes.${index}.country`, country?.name || "");
-  };
-
   const onSubmit = async (data: LinkFormInput) => {
     try {
-      const expires_at = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59`).toISOString() : null;
+      const expiresAt = data.expiresAt ? new Date(`${data.expiresAt}T23:59:59`).toISOString() : null;
       const nextPassword = data.linkPassword?.trim() ?? "";
       await updateLink.mutateAsync({
         id: link.id,
-        updates: { name: data.name, default_url: data.defaultUrl, expires_at, qr_config: qrConfigRef.current },
+        updates: {
+          name: data.name,
+          default_url: data.defaultUrl,
+          webhook_url: data.webhookUrl || null,
+          expires_at: expiresAt,
+          qr_config: qrConfigRef.current,
+        },
         password: clearPassword ? "" : nextPassword || undefined,
       });
       await updateGeoRoutes.mutateAsync({
@@ -88,16 +105,20 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
       toast({ title: "Đã cập nhật thành công! ✨" });
     } catch (error) {
       const description = error instanceof Error ? error.message : "";
-      toast({ title: "Lỗi cập nhật", description: description || "Vui lòng thử lại", variant: "destructive" });
+      toast({
+        title: "Lỗi cập nhật",
+        description: description || "Vui lòng thử lại",
+        variant: "destructive",
+      });
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg bg-card border-border">
+      <DialogContent className="sm:max-w-lg border-border bg-card">
         <DialogHeader>
           <DialogTitle className="text-xl">Chỉnh sửa link</DialogTitle>
-          <DialogDescription>Cập nhật thông tin, mật khẩu hoặc chuyển hướng theo quốc gia.</DialogDescription>
+          <DialogDescription>Cập nhật thông tin, mật khẩu, webhook hoặc chuyển hướng theo quốc gia.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-4">
@@ -114,7 +135,9 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
           </div>
 
           <div className="space-y-1">
-            <Label>Ngày hết hạn <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span></Label>
+            <Label>
+              Ngày hết hạn <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span>
+            </Label>
             <Input type="date" {...register("expiresAt")} />
           </div>
 
@@ -154,46 +177,27 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
             {errors.linkPassword && <p className="text-xs text-destructive">{errors.linkPassword.message}</p>}
           </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-primary" />
-                Chuyển hướng theo quốc gia
-              </Label>
-              <Button type="button" variant="ghost" size="sm" onClick={() => append({ country: "", countryCode: "", targetUrl: "" })}>
-                <Plus className="mr-1 h-3 w-3" /> Thêm
-              </Button>
-            </div>
-
-            {fields.length === 0 && <p className="text-xs text-muted-foreground">Thêm rule để chuyển hướng người dùng theo IP/quốc gia.</p>}
-
-            {fields.map((field, index) => (
-              <div key={field.id} className="mb-3 space-y-1">
-                <div className="flex items-center gap-2">
-                  <select
-                    value={watch(`geoRoutes.${index}.countryCode`)}
-                    onChange={(event) => handleCountryChange(index, event.target.value)}
-                    className="h-9 flex-shrink-0 rounded-md border border-border bg-secondary px-3 text-sm"
-                  >
-                    <option value="">Chọn quốc gia</option>
-                    {COUNTRIES.map((country) => <option key={country.code} value={country.code}>{country.flag} {country.name}</option>)}
-                  </select>
-                  <Input placeholder="URL đích" {...register(`geoRoutes.${index}.targetUrl`)} className="flex-1" />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-                <Input
-                  placeholder="Bypass URL (nếu bị chặn) - ví dụ: https://translate.google.com/translate?u=..."
-                  {...register(`geoRoutes.${index}.bypassUrl`)}
-                  className="h-8 text-xs text-muted-foreground"
-                />
-                {errors.geoRoutes?.[index]?.countryCode && <p className="text-xs text-destructive">{errors.geoRoutes[index]?.countryCode?.message}</p>}
-                {errors.geoRoutes?.[index]?.targetUrl && <p className="text-xs text-destructive">{errors.geoRoutes[index]?.targetUrl?.message}</p>}
-                {errors.geoRoutes?.[index]?.bypassUrl && <p className="text-xs text-destructive">{errors.geoRoutes[index]?.bypassUrl?.message}</p>}
-              </div>
-            ))}
+          <div className="space-y-1">
+            <Label>
+              Webhook nhận click <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span>
+            </Label>
+            <Input placeholder="https://example.com/webhooks/qrlive" {...register("webhookUrl")} />
+            <p className="text-xs text-muted-foreground">
+              Để trống nếu muốn tắt thông báo. QRLive chỉ gửi khi click hợp lệ được lưu vào analytics.
+            </p>
+            {errors.webhookUrl && <p className="text-xs text-destructive">{errors.webhookUrl.message}</p>}
           </div>
+
+          <LinkGeoRoutesFields
+            append={append}
+            errors={errors}
+            fields={fields}
+            emptyMessage="Thêm rule để chuyển hướng người dùng theo IP/quốc gia."
+            register={register}
+            remove={remove}
+            setValue={setValue}
+            watch={watch}
+          />
 
           <Button type="submit" disabled={isSubmitting} className="w-full font-semibold gradient-primary">
             <Save className="mr-2 h-4 w-4" />

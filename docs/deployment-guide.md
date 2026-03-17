@@ -177,6 +177,16 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
 - Preview
 - Development
 
+### For GitHub Actions PR CI
+Add these repository secrets in GitHub → Settings → Secrets and variables → Actions:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `E2E_TEST_EMAIL`
+- `E2E_TEST_PASSWORD`
+
+The Playwright PR job only runs when all four secrets are present. This keeps fork PRs from failing because protected secrets are unavailable.
+
 ---
 
 ## Step 5: Frontend Deployment (Vercel)

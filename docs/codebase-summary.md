@@ -10,6 +10,7 @@
 - Geo-routing to 15 countries
 - Bypass URLs for geo-blocking
 - Real-time click analytics
+- Click webhook notifications
 - QR customization persistence
 - Sentry error tracking
 - Bulk CSV import/export
@@ -31,9 +32,9 @@
 | **Tests** | 308 passing unit/integration tests (289 app + 19 worker) + 30 Playwright E2E |
 | **Code Files** | ~60 (src/ + supabase/ + functions/) |
 | **Dependencies** | 46 prod + 25 dev |
-| **Build Time** | ~5s (clean, no warnings) |
+| **Build Time** | ~5s (passes; Vite chunk-size warning remains) |
 | **Bundle Size** | 147KB gzipped (main), StatsPanel/StatsCharts lazy-loaded |
-| **Last Updated** | 2026-03-17 (worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
+| **Last Updated** | 2026-03-17 (click webhooks, PR CI, worker prod setup, E2E audit, QR persistence, exports, Sentry, bulk ops) |
 
 ---
 
@@ -41,6 +42,9 @@
 
 ```
 qrlive/
+├── .github/
+│   └── workflows/
+│       └── ci.yml               # Pull request CI: lint, typecheck, tests, build, Playwright E2E
 ├── src/
 │   ├── pages/                 # Route pages (Index, Auth, NotFound)
 │   ├── components/            # Reusable UI + 45 shadcn/ui components
@@ -58,17 +62,19 @@ qrlive/
 │   │   ├── types.ts           # TypeScript types
 │   │   └── query-keys.ts      # React Query keys
 │   ├── integrations/supabase/ # Supabase client & types
-│   ├── test/                  # 289 unit/integration tests (20 files, app project)
+│   ├── test/                  # 289 unit/integration tests (24 files, app project)
 │   ├── App.tsx                # Root component + routing (code-split)
 │   ├── main.tsx               # Entry point
 │   └── index.css              # Tailwind + global styles
 │
 ├── supabase/
 │   ├── functions/redirect/
-│   │   ├── redirect-handler.ts  # Runtime-agnostic handler logic [NEW 2026-03-16]
-│   │   └── index.ts             # Thin Deno wrapper
+│   │   ├── click-webhook.ts      # click.created payload builder + delivery helper [NEW 2026-03-17]
+│   │   ├── redirect-handler.ts  # Runtime-agnostic handler logic [UPDATED 2026-03-17]
+│   │   ├── redirect-password.ts # Password verification + protected-link form helper [NEW 2026-03-17]
+│   │   └── index.ts             # Thin Deno wrapper + background webhook queueing
 │   ├── functions/proxy/         # Content-fetch proxy (FALLBACK/TESTING ONLY)
-│   └── migrations/            # 11 database migrations
+│   └── migrations/            # 13 database migrations
 │
 ├── cloudflare-worker/           # ✅ Canonical redirect-domain gateway (r.yourdomain.com → Supabase edge)
 │   ├── redirect-proxy.js        # Worker handler (extractShortCode, buildUpstreamHeaders, fetch)
@@ -106,10 +112,16 @@ Additional service: `proxy-gateway/` contains the always-on bypass gateway for H
 - **src/components/bulk-import-dialog.tsx** — Drag-drop CSV import flow with preview/progress states
 - **src/components/bulk-import-preview-table.tsx** — Scrollable row-by-row validation preview for imports
 - **src/components/bulk-export-button.tsx** — Dashboard-level CSV export button for all links
+- **src/components/link-geo-routes-fields.tsx** — Shared geo-route field-array UI used by create/edit dialogs
+
+### New Edge Modules
+- **supabase/functions/redirect/click-webhook.ts** — Builds `click.created` payloads and POSTs them with timeout + headers
+- **supabase/functions/redirect/redirect-password.ts** — Extracted password hashing/verification + protected-link HTML form
 
 ### New E2E Surface
 - **e2e/** — Playwright specs for auth, link CRUD, QR customization, analytics, and bulk operations, plus shared helpers
 - **playwright.config.ts** — Chromium-only Playwright config with `webServer` booting Vite on port `5173`
+- **.github/workflows/ci.yml** — PR CI workflow for lint, typecheck, Vitest, production build, and secret-gated Playwright E2E
 
 ---
 
@@ -122,8 +134,9 @@ Additional service: `proxy-gateway/` contains the always-on bypass gateway for H
 
 ### Business Components (src/components/)
 - **LinkCard.tsx** — Displays single QR link with actions
-- **CreateLinkDialog.tsx** — Modal form to create new link
-- **EditLinkDialog.tsx** — Modal form to edit existing link (expiration, password)
+- **CreateLinkDialog.tsx** — Modal form to create new link (expiration, password, webhook)
+- **EditLinkDialog.tsx** — Modal form to edit existing link (expiration, password, webhook)
+- **link-geo-routes-fields.tsx** — Shared geo-route editor for both link dialogs
 - **StatsPanel.tsx** — Analytics: 7-day chart, country pie, referer list
 - **QRPreview.tsx** — Renders QR code for short URL
 - **analytics-date-range-picker.tsx** — Date range selector for analytics queries [NEW 2026-03-16]
@@ -186,6 +199,7 @@ user_id UUID FK → auth.users(id)
 name TEXT
 short_code TEXT UNIQUE  -- auto-generated: ^[A-Z0-9]{6}$ OR custom: ^[A-Z0-9_-]{3,20}$ (validated & collision-safe)
 default_url TEXT
+webhook_url TEXT (nullable)      -- [NEW 2026-03-17] optional click webhook endpoint
 is_active BOOLEAN
 expires_at TIMESTAMP (nullable)  -- [NEW 2026-03-16] link expiration date
 password_hash TEXT (nullable)    -- [UPDATED 2026-03-16] PBKDF2 self-describing format (legacy SHA-256 compat)
@@ -277,19 +291,22 @@ Create/update/delete mutations trigger targeted invalidation for `QUERY_KEYS.lin
 5. Extract geo data: country (cf-ipcountry), IP, user-agent, referer
 6. Check bot pattern (skip recording for crawlers)
 7. Rate limit check (1 click/IP/60s)
-8. Record click if pass all checks
-9. Resolve redirect: bypass_url → target_url → default_url
-10. Validate protocol (^https?://)
-11. Return 302 + no-store cache headers
+8. Resolve redirect: bypass_url → target_url → default_url
+9. Validate protocol (^https?://)
+10. Record click if pass all checks
+11. Queue optional `click.created` webhook in background
+12. Return 302 + no-store cache headers
 
 **Key Details**:
 - Handler logic extracted into `redirect-handler.ts` with `SupabaseAdapter` interface for testability
+- Background webhook delivery uses `EdgeRuntime.waitUntil` in `index.ts`
 - Geo detection: Cloudflare header only (local dev: manual header)
 - Bot pattern: `/bot|crawler|spider|prerender|headless|facebookexternalhit|twitterbot|slurp/i`
 - Rate limiting: Query last 60s, skip if count > 0
 - CORS: Enabled for all origins
 - Expiration: Return 410 Gone if link expired
 - Password: PBKDF2-HMAC-SHA256 verification with constant-time comparison; legacy SHA-256 compat; opportunistic rehash
+- Webhook payload: `click.created` with link info, redirect target, geo-routing flag, country code, and referer
 
 ---
 
@@ -319,15 +336,13 @@ E2E_TEST_PASSWORD=[seeded-test-user-password]
 ### High-Level Breakdown
 
 **App project (289 tests, jsdom):**
-- **Schemas & Validation** (17 tests) — auth, links, geo-routes, URL validation
-- **Database & Data Layer** (57 tests) — db utils, mutations, query helpers, query keys
-- **Auth Context** (8 tests) — session lifecycle, sign in/up/out, normalized errors
-- **Hooks & Utilities** (37 tests) — use-links, use-link-mutations, password utilities
-- **Pages** (22 tests) — Auth, Index, NotFound rendering and interactions
-- **UI Components** (92 tests) — LinkCard, StatsPanel, Create/Edit dialogs, QRPreview, analytics date picker
-- **Redirect Integration (simulator)** (42 tests) — password, expiration, geo-routing, redirect flow behavior
-- **Redirect Handler (real logic)** (13 tests) — direct tests against `redirect-handler.ts`
-- **App Smoke** (1 test) — Vitest wiring
+- **Schemas & Validation** — auth, links, geo-routes, URL validation, and optional webhook URLs
+- **Database & Data Layer** — db utils, mutations, query helpers, and query keys
+- **Auth Context & Hooks** — session lifecycle, sign in/up/out, normalized errors, and query wiring
+- **Pages & UI Components** — Auth, Index, NotFound, LinkCard, StatsPanel, Create/Edit dialogs, QRPreview, analytics, and bulk flows
+- **Redirect Integration (simulator)** — password, expiration, geo-routing, and redirect flow behavior
+- **Redirect Handler + Webhook Helpers** — direct tests against `redirect-handler.ts` plus `click-webhook.ts`
+- **App Smoke** — Vitest wiring
 
 **Cloudflare Worker project (19 tests, node):**
 - **extractShortCode** (5 tests) — `/CODE`, `/r/CODE`, edge cases
@@ -359,6 +374,7 @@ Auth-gated specs read `E2E_TEST_EMAIL` and `E2E_TEST_PASSWORD` from `.env.local`
 - Bot traffic skips click insert
 - Non-bot records click
 - Duplicate click within 60s skipped
+- Background webhook queueing + failure isolation
 - Non-http URL → 400
 
 ### Proxy Gateway Smoke Tests (3 tests)
@@ -432,10 +448,11 @@ supabase functions deploy redirect --no-verify-jwt
 | **src/contexts/auth-context.tsx** | Auth state + methods (useAuth hook) |
 | **src/hooks/use-links.ts** | React Query: fetch links |
 | **src/hooks/use-link-mutations.ts** | React Query: mutations with refetch |
-| **src/components/Index.tsx** | Dashboard (main page) |
+| **src/pages/Index.tsx** | Dashboard (main page) |
 | **src/components/LinkCard.tsx** | Link display + actions |
-| **src/components/CreateLinkDialog.tsx** | Create form modal |
-| **src/components/EditLinkDialog.tsx** | Edit form modal (expiration, password) |
+| **src/components/CreateLinkDialog.tsx** | Create form modal (includes optional click webhook) |
+| **src/components/EditLinkDialog.tsx** | Edit form modal (expiration, password, webhook) |
+| **src/components/link-geo-routes-fields.tsx** | Shared geo-route field array for create/edit dialogs |
 | **src/components/analytics-date-range-picker.tsx** | Date range selector [NEW 2026-03-16] |
 | **src/components/analytics-export-button.tsx** | CSV/PDF export dropdown trigger [NEW 2026-03-17] |
 | **src/components/bulk-import-dialog.tsx** | CSV import modal with drag-drop + progress [NEW 2026-03-17] |
@@ -448,8 +465,10 @@ supabase functions deploy redirect --no-verify-jwt
 | **cloudflare-worker/redirect-proxy.test.js** | 19 Vitest tests: proxy contract, headers, errors [NEW 2026-03-17] |
 | **cloudflare-worker/wrangler.toml** | Wrangler deployment config (secrets: SUPABASE_URL, SUPABASE_ANON_KEY) |
 | **cloudflare-worker/README.md** | Worker setup, secrets, deploy, test instructions [NEW 2026-03-17] |
-| **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (SupabaseAdapter interface) [NEW 2026-03-16] |
-| **supabase/functions/redirect/index.ts** | Thin Deno wrapper for redirect handler |
+| **supabase/functions/redirect/click-webhook.ts** | `click.created` payload builder + POST delivery helper [NEW 2026-03-17] |
+| **supabase/functions/redirect/redirect-handler.ts** | Runtime-agnostic redirect handler logic (webhook queueing + click gating) [UPDATED 2026-03-17] |
+| **supabase/functions/redirect/redirect-password.ts** | Password verification + protected-link form HTML [NEW 2026-03-17] |
+| **supabase/functions/redirect/index.ts** | Thin Deno wrapper for redirect handler + background tasks |
 
 ---
 
@@ -553,8 +572,8 @@ supabase functions deploy redirect --no-verify-jwt
 
 | Issue | Severity | Fix Time | Status |
 |-------|----------|----------|--------|
-| App/component/hook test expansion | Medium | ✅ Complete | 289 tests across 20 files |
-| Redirect handler direct tests (13 tests) | Medium | ✅ Complete | 2026-03-16 |
+| App/component/hook test expansion | Medium | ✅ Complete | 289 tests across 24 files |
+| Redirect handler + webhook helper tests | Medium | ✅ Complete | 2026-03-17 |
 | Long-range analytics pre-aggregation | Medium | 1-2 hours | Pending |
 | Main bundle size reduction (790KB → 490KB) | Low | ✅ Fixed | Code-split, lazy-loaded |
 | db.ts modularization (252 → 5 files) | Low | ✅ Fixed | 2026-03-16 |
@@ -640,6 +659,6 @@ Project owned by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-17 (worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
+**Last Updated**: 2026-03-17 (click webhooks, worker prod setup, E2E audit, QR persistence, Sentry, analytics export, bulk ops)
 **Next Review**: 2026-04-16
-**Version**: v1.5 | **Tests**: 308/308 unit+integration passing (289 app + 19 worker) + 30 E2E | **Status**: Production-ready
+**Version**: v1.7 | **Tests**: 308/308 unit+integration passing (289 app + 19 worker) + 30 E2E | **Status**: Production-ready

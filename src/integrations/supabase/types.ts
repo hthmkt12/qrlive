@@ -97,29 +97,50 @@ export type Database = {
         Row: {
           created_at: string
           default_url: string
+          expires_at: string | null
+          has_password: boolean | null
           id: string
           is_active: boolean
           name: string
+          password_hash: string | null
+          password_salt: string | null
+          qr_config: Json | null
           short_code: string
           updated_at: string
+          user_id: string | null
+          webhook_url: string | null
         }
         Insert: {
           created_at?: string
           default_url: string
+          expires_at?: string | null
+          has_password?: boolean | null
           id?: string
           is_active?: boolean
           name: string
+          password_hash?: string | null
+          password_salt?: string | null
+          qr_config?: Json | null
           short_code: string
           updated_at?: string
+          user_id?: string | null
+          webhook_url?: string | null
         }
         Update: {
           created_at?: string
           default_url?: string
+          expires_at?: string | null
+          has_password?: boolean | null
           id?: string
           is_active?: boolean
           name?: string
+          password_hash?: string | null
+          password_salt?: string | null
+          qr_config?: Json | null
           short_code?: string
           updated_at?: string
+          user_id?: string | null
+          webhook_url?: string | null
         }
         Relationships: []
       }

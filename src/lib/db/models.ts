@@ -15,6 +15,7 @@ export interface QRLinkRow {
   name: string;
   short_code: string;
   default_url: string;
+  webhook_url: string | null;
   is_active: boolean;
   created_at: string;
   expires_at: string | null;

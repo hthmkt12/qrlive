@@ -28,10 +28,12 @@ const mockLinks = [
     name: "Test Link",
     short_code: "ABC123",
     default_url: "https://example.com",
+    webhook_url: null,
     is_active: true,
     created_at: "2026-03-15T00:00:00Z",
     expires_at: null,
     has_password: false,
+    qr_config: null,
     geo_routes: [{ id: "r1", link_id: "link-1", country: "Vietnam", country_code: "VN", target_url: "https://vn.example.com" }],
   },
 ];

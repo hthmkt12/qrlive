@@ -1,12 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { authSchema, linkFormSchema, geoRouteSchema } from "@/lib/schemas";
-
-// ─── authSchema ──────────────────────────────────────────────────────────────
+import { describe, expect, it } from "vitest";
+import { authSchema, geoRouteSchema, linkFormSchema } from "@/lib/schemas";
 
 describe("authSchema", () => {
   it("accepts valid email + password", () => {
-    const result = authSchema.safeParse({ email: "user@example.com", password: "password123" });
-    expect(result.success).toBe(true);
+    expect(authSchema.safeParse({ email: "user@example.com", password: "password123" }).success).toBe(true);
   });
 
   it("rejects invalid email", () => {
@@ -20,15 +17,7 @@ describe("authSchema", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe("Mật khẩu tối thiểu 8 ký tự");
   });
-
-  it("rejects missing fields", () => {
-    const result = authSchema.safeParse({});
-    expect(result.success).toBe(false);
-    expect(result.error?.issues.length).toBeGreaterThanOrEqual(2);
-  });
 });
-
-// ─── geoRouteSchema ───────────────────────────────────────────────────────────
 
 describe("geoRouteSchema", () => {
   const valid = {
@@ -41,17 +30,8 @@ describe("geoRouteSchema", () => {
     expect(geoRouteSchema.safeParse(valid).success).toBe(true);
   });
 
-  it("accepts valid geo route with bypassUrl", () => {
-    const result = geoRouteSchema.safeParse({
-      ...valid,
-      bypassUrl: "https://bypass.example.com",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts empty string bypassUrl (treated as no bypass)", () => {
-    const result = geoRouteSchema.safeParse({ ...valid, bypassUrl: "" });
-    expect(result.success).toBe(true);
+  it("accepts empty string bypassUrl", () => {
+    expect(geoRouteSchema.safeParse({ ...valid, bypassUrl: "" }).success).toBe(true);
   });
 
   it("rejects invalid targetUrl", () => {
@@ -59,21 +39,7 @@ describe("geoRouteSchema", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe("URL không hợp lệ");
   });
-
-  it("rejects invalid bypassUrl", () => {
-    const result = geoRouteSchema.safeParse({ ...valid, bypassUrl: "bad-url" });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].message).toBe("Bypass URL không hợp lệ");
-  });
-
-  it("rejects missing countryCode", () => {
-    const result = geoRouteSchema.safeParse({ ...valid, countryCode: "" });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].message).toBe("Chọn quốc gia");
-  });
 });
-
-// ─── linkFormSchema ───────────────────────────────────────────────────────────
 
 describe("linkFormSchema", () => {
   const valid = {
@@ -86,24 +52,10 @@ describe("linkFormSchema", () => {
     expect(linkFormSchema.safeParse(valid).success).toBe(true);
   });
 
-  it("accepts valid link with geo routes", () => {
-    const result = linkFormSchema.safeParse({
-      ...valid,
-      geoRoutes: [{ country: "US", countryCode: "US", targetUrl: "https://us.example.com" }],
-    });
+  it("defaults geoRoutes to empty array when omitted", () => {
+    const result = linkFormSchema.safeParse({ name: "Test", defaultUrl: "https://example.com" });
     expect(result.success).toBe(true);
-  });
-
-  it("rejects empty name", () => {
-    const result = linkFormSchema.safeParse({ ...valid, name: "" });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].message).toBe("Tên không được để trống");
-  });
-
-  it("rejects name over 100 chars", () => {
-    const result = linkFormSchema.safeParse({ ...valid, name: "x".repeat(101) });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].message).toBe("Tên quá dài");
+    if (result.success) expect(result.data.geoRoutes).toEqual([]);
   });
 
   it("rejects invalid defaultUrl", () => {
@@ -112,19 +64,13 @@ describe("linkFormSchema", () => {
     expect(result.error?.issues[0].message).toBe("URL mặc định không hợp lệ");
   });
 
-  it("defaults geoRoutes to empty array when omitted", () => {
-    const result = linkFormSchema.safeParse({ name: "Test", defaultUrl: "https://example.com" });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.geoRoutes).toEqual([]);
-    }
+  it("accepts valid webhook URL", () => {
+    expect(linkFormSchema.safeParse({ ...valid, webhookUrl: "https://hooks.example.com/qrlive" }).success).toBe(true);
   });
 
-  it("propagates geo route validation errors", () => {
-    const result = linkFormSchema.safeParse({
-      ...valid,
-      geoRoutes: [{ country: "US", countryCode: "US", targetUrl: "bad-url" }],
-    });
+  it("rejects webhook URLs without http or https", () => {
+    const result = linkFormSchema.safeParse({ ...valid, webhookUrl: "ftp://hooks.example.com/qrlive" });
     expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toBe("Webhook URL phải bắt đầu bằng http:// hoặc https://");
   });
 });

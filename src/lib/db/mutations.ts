@@ -27,7 +27,8 @@ export async function createLinkInDB(
   customShortCode?: string,
   expiresAt?: string | null,
   password?: string,
-  qrConfig?: QrConfig | null
+  qrConfig?: QrConfig | null,
+  webhookUrl?: string | null
 ): Promise<QRLinkRow> {
   let shortCode: string;
 
@@ -66,6 +67,7 @@ export async function createLinkInDB(
       password_hash: passwordHash,
       password_salt: null,
       qr_config: qrConfig ?? null,
+      webhook_url: webhookUrl ?? null,
     })
     .select()
     .single();
@@ -99,7 +101,14 @@ export async function createLinkInDB(
 
 export async function updateLinkInDB(
   id: string,
-  updates: { name?: string; default_url?: string; is_active?: boolean; expires_at?: string | null; qr_config?: QrConfig | null },
+  updates: {
+    name?: string;
+    default_url?: string;
+    webhook_url?: string | null;
+    is_active?: boolean;
+    expires_at?: string | null;
+    qr_config?: QrConfig | null;
+  },
   password?: string // undefined = no change; "" = clear password; non-empty = set new password
 ) {
   // Build password fields based on the password param

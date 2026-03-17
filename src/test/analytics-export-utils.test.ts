@@ -37,11 +37,13 @@ describe("CSV export sanitization", () => {
       name: "=IMPORTXML(\"http://evil\")",
       short_code: "SAFE12",
       default_url: "https://example.com",
+      webhook_url: null,
       is_active: true,
       created_at: "2026-03-16T00:00:00Z",
       expires_at: null,
       geo_routes: [],
       has_password: false,
+      qr_config: null,
     }];
 
     expect(generateLinksCSV(links)).toContain("\"'=IMPORTXML(\"\"http://evil\"\")\"");

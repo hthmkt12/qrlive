@@ -3,7 +3,7 @@
 **Project**: QRLive — Dynamic QR Code Link Shortener
 **Current Status**: MVP Complete & Deployed
 **Last Updated**: 2026-03-17
-**Overall Progress**: 100% (15/15 shipped phases complete)
+**Overall Progress**: 100% (17/17 shipped phases complete)
 **Repository**: hthmkt12/qrlive
 **Live URL**: https://qrlive.vercel.app
 
@@ -91,7 +91,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Proxy gateway smoke tests (3 tests)
 - [x] Analytics query helper tests (4 tests)
 - [x] Cloudflare Worker proxy tests (19 tests) — contract, error handling
-- [x] All tests passing (308/308 across 21 test files, via `test.projects`)
+- [x] All tests passing (308/308 across 25 test files, via `test.projects`)
 - [x] Test setup & fixtures
 
 ### Phase 08: Deployment ✅
@@ -99,7 +99,7 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] Supabase backend setup
 - [x] Edge function deployment
 - [x] Environment variable configuration
-- [x] Database migrations (11 migrations)
+- [x] Database migrations (13 migrations)
 - [x] RLS policies enforced
 - [x] Auto-deploy from GitHub
 - [x] Production URL (qrlive.vercel.app)
@@ -154,6 +154,20 @@ PHASE 01  PHASE 02  PHASE 03  PHASE 04  PHASE 05  PHASE 06  PHASE 07  PHASE 08  
 - [x] 19 Vitest tests (proxy contract, error handling) integrated via `test.projects`
 - [x] Worker README with setup/deploy instructions
 
+### Phase 16: GitHub Actions PR CI ✅
+- [x] Added `.github/workflows/ci.yml` for pull requests + manual dispatch
+- [x] `quality` job runs lint, `tsc --noEmit`, `npm test`, and `npm run build`
+- [x] `e2e` job runs Playwright on PRs when Supabase + seeded E2E secrets are configured
+- [x] Uploaded Playwright artifacts (`playwright-report`, `test-results`) for CI debugging
+- [x] Added concurrency cancellation so superseded PR runs stop automatically
+
+### Phase 17: Webhook Integrations ✅
+- [x] Added nullable `webhook_url` to `qr_links`
+- [x] Added create/edit form support for optional click webhooks
+- [x] Dispatch `click.created` JSON payloads for recorded clicks only
+- [x] Use background delivery in the redirect edge function so redirects do not wait on webhook responses
+- [x] Added webhook payload/delivery tests plus redirect handler regressions
+
 ---
 
 ## In-Progress Features
@@ -171,9 +185,9 @@ None currently blocking.
 
 | Issue | Impact | Fix Effort | Status |
 |-------|--------|-----------|--------|
-| **>80% test coverage** | ✅ 308 tests, 21 files (289 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
+| **>80% test coverage** | ✅ 308 tests, 25 files (289 app + 19 worker, exceeds target) | Complete | ✅ Complete (2026-03-17) |
 | **Component + hook + page + db mutation tests** | ✅ 70+ new tests added (use-links, analytics-date-range-picker, query-keys, pages-*, db-mutations) | Complete | ✅ Complete (2026-03-16) |
-| **Redirect handler direct tests** | ✅ 13 tests exercising real edge logic via extracted handler (redirect-handler.ts) | Complete | ✅ Complete (2026-03-16) |
+| **Redirect handler + webhook helper tests** | ✅ Real edge logic plus click webhook delivery coverage | Complete | ✅ Complete (2026-03-17) |
 | **Analytics pre-aggregation/caching** | Stats panel uses aggregate RPCs; higher-volume reports may want cached rollups | Medium | Pending |
 | **Large JS bundle** | ✅ Code-split: 490KB main (147KB gzip), StatsCharts lazy-loaded | Complete | ✅ Complete |
 | **Linting & type errors** | ✅ All resolved (no-explicit-any, no-empty-object-type, tooling exclusions) | Complete | ✅ Complete |
@@ -181,7 +195,7 @@ None currently blocking.
 
 **Details**:
 1. **Component test coverage**: ✅ Complete (2026-03-17). 53 + 12 + 18 = 83 component/hook tests.
-   - UI, hooks, pages, and data-layer tests now span 308 tests across 21 files (289 app + 19 worker).
+   - UI, hooks, pages, and data-layer tests now span 308 tests across 25 files (289 app + 19 worker).
    - Direct redirect-handler coverage was added on top of the earlier simulator tests.
 
 2. **Link expiration & password protection**: ✅ Completed (2026-03-16).
@@ -194,11 +208,15 @@ None currently blocking.
    - RPC support for custom date queries ✅
    - Dashboard integration ✅
 
-4. **Redirect handler direct testing**: ✅ Completed (2026-03-16). Edge logic extracted into `supabase/functions/redirect/redirect-handler.ts` with `SupabaseAdapter` interface. 13 Vitest tests cover all paths (password, expiration, geo-routing, bot filtering, rate limiting). Fully deployed E2E verification remains a separate concern.
+4. **Redirect handler + webhook testing**: ✅ Completed (2026-03-17). Edge logic lives in `supabase/functions/redirect/redirect-handler.ts` behind a `SupabaseAdapter` interface, with companion tests for `click-webhook.ts`. Coverage now includes password, expiration, geo-routing, bot filtering, duplicate suppression, background queueing, and delivery-failure isolation. Fully deployed E2E verification remains a separate concern.
 
 5. **Large JS bundle**: ✅ Resolved. Main bundle: 490KB (147KB gzip); route-level code splitting; StatsCharts lazy-loaded as separate chunk.
 
 6. **Code modularization**: ✅ Resolved. src/lib/db.ts refactored into modular structure (models.ts, queries.ts, mutations.ts, utils.ts) with barrel export.
+
+7. **PR CI wiring**: ✅ Completed (2026-03-17).
+   - GitHub Actions now runs lint, typecheck, unit/integration tests, and production build on pull requests.
+   - Credentialed Playwright E2E runs automatically when `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `E2E_TEST_EMAIL`, and `E2E_TEST_PASSWORD` secrets are present.
 
 ### Low Priority
 - [ ] API documentation (OpenAPI/Swagger)
@@ -210,7 +228,7 @@ None currently blocking.
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| **Test Coverage** | >80% | 308 tests, 21 files (289 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
+| **Test Coverage** | >80% | 308 tests, 25 files (289 app + 19 worker) | ✅ Exceeded target (2026-03-17) |
 | **Build Time** | <30s | ~5s | ✅ Met |
 | **Page Load** | <2s | <1.5s | ✅ Met |
 | **Redirect Latency** | <100ms | ~50ms (edge) | ✅ Met |
@@ -253,13 +271,13 @@ None currently blocking.
 **Effort**: 3-4 weeks | **Impact**: Medium (enterprise)
 
 #### 4. Integrations
-- [ ] Webhook notifications (click events)
+- [x] Webhook notifications (click events)
 - [ ] Slack integration (post alerts)
 - [ ] API for programmatic access (REST endpoints)
 - [ ] Zapier integration
 - [ ] Google Analytics integration
 
-**Effort**: 2-3 weeks | **Impact**: High (automation)
+**Effort**: 2-3 weeks | **Impact**: High (automation) | **Status**: Core webhook delivery complete, downstream integrations still pending
 
 #### 5. Performance & Reliability
 - [ ] Database read replicas (scale analytics queries)
@@ -291,7 +309,7 @@ None currently blocking.
 
 ## Testing Roadmap
 
-### Current Coverage (308 tests, 21 files) ✅
+### Current Coverage (308 tests, 25 files) ✅
 - ✅ Schemas & validation (17 tests)
 - ✅ Database & data layer (57 tests)
 - ✅ Auth context (8 tests)
@@ -299,17 +317,17 @@ None currently blocking.
 - ✅ Pages (22 tests)
 - ✅ UI components (92 tests)
 - ✅ Redirect integration via simulator (42 tests)
-- ✅ Redirect handler direct tests (13 tests) — exercises real edge logic via SupabaseAdapter mock
+- ✅ Redirect handler direct tests (real edge logic via SupabaseAdapter mock)
+- ✅ Click webhook helper tests (payload + delivery contract)
 - ✅ Cloudflare Worker proxy tests (19 tests) — contract, headers, error handling
 - ✅ Vitest sanity test (1 test)
 - ✅ Playwright E2E suite: 30 passed, 0 skipped (Chromium, auth-gated dashboard flows + redirect smoke)
 
 ### Remaining (before 1.0 release)
 - [ ] Integration tests (create link → redirect → analytics)
-- [ ] CI wiring for credentialed Playwright dashboard flows
-- [ ] Full end-to-end deployed edge function tests
+- [ ] Full end-to-end deployed edge function + webhook monitor
 
-**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 308 tests across 21 files
+**Target**: >80% coverage | **Current**: ✅ ACHIEVED (2026-03-17) | 308 tests across 25 files
 
 ---
 
@@ -419,7 +437,7 @@ None identified.
 - [x] Bypass URL support
 
 ### V1.0 (Next Phase)
-- [x] >80% test coverage ✅ (2026-03-17: 308 tests across 21 files)
+- [x] >80% test coverage ✅ (2026-03-17: 308 tests across 25 files)
 - [x] Component tests added ✅ (2026-03-16: 51 component tests)
 - [x] Hook tests added ✅ (2026-03-16: 50+ hook tests)
 - [x] Page component tests ✅ (2026-03-16: 30+ page tests)
@@ -427,13 +445,14 @@ None identified.
 - [x] Password-protected links ✅ (2026-03-16: PBKDF2-HMAC-SHA256 hashing + constant-time verify + legacy compat)
 - [x] Advanced analytics ✅ (2026-03-17: country filter + export + quick ranges)
 - [x] E2E tests with Playwright ✅ (2026-03-17: 30 passed, 0 skipped — auth/CRUD/QR/analytics/bulk/redirect specs)
+- [x] Webhook integrations ✅ (2026-03-17: per-link click.created POST notifications)
 - [ ] API documentation
 - [ ] User guide
 
 ### V2.0 (Platform)
 - [ ] Team collaboration
 - [ ] Organizations
-- [ ] Webhook integrations
+- [x] Webhook integrations
 - [ ] Mobile apps
 - [ ] 99.99% uptime SLA
 

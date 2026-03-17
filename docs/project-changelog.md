@@ -10,8 +10,54 @@ All significant changes, features, and fixes documented here.
 
 ### Planned Features
 - Referer breakdown by country
-- CI wiring for credentialed Playwright dashboard flows
 - API documentation / user guide
+
+---
+
+## [2026-03-17-v1.7] — Click Webhook Integrations
+
+### Added
+- **Per-link webhook configuration**
+  - Added nullable `webhook_url` on `qr_links` via migration `20260317113000_add_webhook_url_to_qr_links.sql`
+  - Wired webhook URL through link create/edit validation, mutations, and dashboard queries
+  - Added Vietnamese form copy describing that notifications fire only for recorded clicks
+
+- **Redirect webhook delivery**
+  - Added `click.created` JSON payload builder + delivery helper under `supabase/functions/redirect/`
+  - Redirect handler now queues webhook POSTs only after a click is actually recorded
+  - Webhook payload includes link identity, destination URL, geo-routing flag, country code, and referer
+
+### Improved
+- **Redirect performance safety**
+  - Supabase edge wrapper now uses background tasks (`EdgeRuntime.waitUntil`) so redirects do not block on webhook responses
+  - Invalid redirect targets are rejected before analytics/webhook side effects run
+
+### Testing
+- Added webhook helper tests plus redirect handler regressions for queueing, duplicate-click suppression, and failure isolation
+- Validation status: `308/308` unit + integration tests passing, `30/30` Playwright passing, build/typecheck clean
+
+---
+
+## [2026-03-17-v1.6] — GitHub Actions PR CI
+
+### Added
+- **GitHub Actions workflow** (`.github/workflows/ci.yml`)
+  - Triggers on pull requests plus manual `workflow_dispatch`
+  - Cancels superseded PR runs via workflow concurrency
+
+- **Quality checks on PR**
+  - Runs `npm run lint`
+  - Runs `npx tsc --noEmit`
+  - Runs `npm test`
+  - Runs `npm run build`
+
+- **Credentialed Playwright E2E on PR**
+  - Runs after quality checks pass
+  - Uses repository secrets for `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `E2E_TEST_EMAIL`, and `E2E_TEST_PASSWORD`
+  - Uploads `playwright-report/` and `test-results/` as artifacts for debugging
+
+### Notes
+- Full dashboard E2E remains secret-gated so fork PRs do not fail purely because repository secrets are unavailable.
 
 ---
 
@@ -311,6 +357,8 @@ All significant changes, features, and fixes documented here.
 | v1.3 | 2026-03-16 | Released | 289 | — (handler extraction + code split) |
 | v1.4 | 2026-03-17 | Released | 289 + Playwright suite | — (QR persistence, exports, Sentry, bulk ops, E2E) |
 | v1.5 | 2026-03-17 | Released | 308 (289 app + 19 worker) + 30 E2E | Worker production, E2E audit |
+| v1.6 | 2026-03-17 | Released | 308 (289 app + 19 worker) + 30 E2E | GitHub Actions PR CI |
+| v1.7 | 2026-03-17 | Released | 308 (289 app + 19 worker) + 30 E2E | Click webhook integrations |
 
 ---
 
@@ -341,7 +389,8 @@ None documented. All releases maintain backward compatibility.
 - ✅ Page components: Tests complete (30+ tests)
 - ✅ Redirect handler: Direct tests complete (13 tests) — exercises real edge logic
 - Integration tests: Not yet written (planned)
-- E2E tests: Playwright suite added; credentialed local dashboard flows verified, CI wiring still pending
+- E2E tests: Playwright suite added; credentialed local dashboard flows verified, and PR CI wiring is complete
+- Deployed edge-function plus live webhook verification still relies on manual smoke checks
 
 ### Analytics
 - ✅ Date range filtering implemented

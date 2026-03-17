@@ -16,7 +16,7 @@ function createAdapter(): SupabaseAdapter {
     async fetchLink(shortCode) {
       const { data, error } = await supabase
         .from("qr_links")
-        .select("id, default_url, expires_at, password_hash, password_salt, geo_routes(*)")
+        .select("id, name, short_code, default_url, webhook_url, expires_at, password_hash, password_salt, geo_routes(*)")
         .eq("short_code", shortCode)
         .eq("is_active", true)
         .single();
@@ -70,7 +70,16 @@ async function toHandlerRequest(req: Request): Promise<HandlerRequest> {
 Deno.serve(async (req) => {
   const adapter = createAdapter();
   const handlerReq = await toHandlerRequest(req);
-  const result = await handleRedirect(handlerReq, adapter);
+  const result = await handleRedirect(handlerReq, adapter, {
+    queueBackgroundTask: (task) => {
+      if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
+        EdgeRuntime.waitUntil(task);
+        return;
+      }
+
+      void task;
+    },
+  });
   return new Response(result.body || null, {
     status: result.status,
     headers: result.headers,

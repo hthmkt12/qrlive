@@ -218,7 +218,43 @@ describe("createLinkInDB", () => {
       expect.objectContaining({
         password_hash: null,
         password_salt: null,
+        webhook_url: null,
       })
+    );
+  });
+
+  it("stores webhook_url when provided", async () => {
+    const { select: collisionSelect } = mockGenerateShortCode();
+    const single = vi.fn().mockResolvedValue({
+      data: { id: "link-1", name: "Test", webhook_url: "https://hooks.example.com/qrlive" },
+      error: null,
+    });
+    const selectAfterInsert = vi.fn().mockReturnValue({ single });
+    const insert = vi.fn().mockReturnValue({ select: selectAfterInsert });
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "qr_links") {
+        const callCount = vi.mocked(supabase.from).mock.calls.filter((c) => c[0] === "qr_links").length;
+        if (callCount <= 1) return { select: collisionSelect } as never;
+        return { insert } as never;
+      }
+      return {} as never;
+    });
+
+    await createLinkInDB(
+      "Test",
+      "https://example.com",
+      [],
+      "user-1",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "https://hooks.example.com/qrlive"
+    );
+
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ webhook_url: "https://hooks.example.com/qrlive" })
     );
   });
 
@@ -329,6 +365,18 @@ describe("updateLinkInDB", () => {
         password_hash: "pbkdf2:sha256:600000:bW9jay1zYWx0:bW9jay1oYXNo",
         password_salt: null,
       })
+    );
+  });
+
+  it("updates webhook_url when provided in link updates", async () => {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    vi.mocked(supabase.from).mockReturnValue({ update } as never);
+
+    await updateLinkInDB("link-1", { webhook_url: "https://hooks.example.com/qrlive" });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ webhook_url: "https://hooks.example.com/qrlive" })
     );
   });
 

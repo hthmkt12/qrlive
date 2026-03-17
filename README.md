@@ -17,6 +17,7 @@ A production-ready QR code link management platform with geo-routing, bypass URL
 - **Geo-Routing**: Route visitors to different URLs based on 15 supported countries (US, GB, JP, KR, DE, FR, VN, TH, SG, AU, CA, BR, IN, CN, RU)
 - **Bypass URLs**: Optional override URLs for accessing geo-blocked content (priority: bypass_url → target_url → default_url)
 - **Click Analytics**: Real-time tracking with date range filtering, country distribution, referer breakdown, and bot filtering
+- **Click Webhooks**: Optional per-link `click.created` POST notifications for recorded clicks
 
 ### User Experience
 - **Vietnamese UI**: All text localized for Vietnamese users
@@ -101,15 +102,17 @@ src/
 ├── hooks/               # useLinks, useLinkMutations, useMobile
 ├── lib/                 # Database ops, schemas, types, utilities
 ├── integrations/        # Supabase client
-├── test/                # 289 unit/integration tests across 20 files
+├── test/                # 289 app tests across 24 files (jsdom project)
 └── App.tsx              # Root component + routing (code-split)
 
 supabase/
 ├── functions/redirect/
+│   ├── click-webhook.ts     # click.created payload builder + delivery helper
 │   ├── redirect-handler.ts  # Runtime-agnostic handler logic (testable)
-│   └── index.ts             # Thin Deno wrapper
+│   ├── redirect-password.ts # Password form + verification helpers
+│   └── index.ts             # Thin Deno wrapper + background webhook queueing
 ├── functions/proxy/         # Content-fetch proxy (FALLBACK/TESTING ONLY)
-└── migrations/          # 11 database migrations
+└── migrations/          # 13 database migrations
 
 cloudflare-worker/           # Redirect-domain gateway (r.yourdomain.com → Supabase edge)
 proxy-gateway/               # Canonical bypass gateway for bypass_url (Fly.io Tokyo)
@@ -142,7 +145,7 @@ npm run typecheck       # TypeScript type checking
 npm run lint            # ESLint code quality
 
 # Testing
-npm run test            # Run app test suite (289 Vitest tests across 20 files)
+npm run test            # Run full test suite (308 Vitest tests across 25 files)
 npm run test:watch     # Watch mode for development
 
 # Building
@@ -164,20 +167,17 @@ npm run gateway:test    # Run proxy-gateway smoke tests
 
 ## Testing
 
-289 app tests across 20 test files covering:
-- **Schemas & Validation** (17 tests): Zod validation for links, auth, geo routes
-- **Database & Data Layer** (57 tests): db utilities, mutations, query helpers, and query keys
-- **Auth Context** (8 tests): Session management, login/logout
-- **Hooks & Utilities** (37 tests): use-links, use-link-mutations, password hashing helpers
-- **Pages** (22 tests): Index, Auth, NotFound page rendering and interactions
-- **UI Components** (92 tests): CreateLinkDialog, EditLinkDialog, LinkCard, StatsPanel, QRPreview, analytics date picker
-- **Redirect Handler** (13 tests): Real edge logic — password, expiration, geo-routing, bot filtering, rate limiting
-- **Redirect Integration** (42 tests): password, expiration, and redirect flow behavior (simulator)
-- **Sanity Check** (1 test): Base Vitest wiring
+308 unit/integration tests across 25 test files covering:
+- **Schemas & Validation**: Zod validation for links, auth, geo routes, and optional webhook URLs
+- **Database & Data Layer**: db utilities, mutations, query helpers, and query keys
+- **Auth Context & Hooks**: session lifecycle, query wiring, and password hashing helpers
+- **Pages & UI Components**: Index/Auth/NotFound plus dialogs, cards, stats, QR preview, analytics controls
+- **Redirect Logic**: simulator coverage plus direct handler tests for password, expiration, geo-routing, bot filtering, duplicate suppression, and click webhooks
+- **Cloudflare Worker**: proxy contract, auth header injection, POST forwarding, and fail-fast errors
 
 Run tests:
 ```bash
-npm run test          # Once
+npm run test          # Run all 308 tests
 npm run gateway:test  # Proxy-gateway smoke tests (3 tests)
 npm run test:watch   # Watch mode
 ```
@@ -201,6 +201,7 @@ npm run test:watch   # Watch mode
 - Rate limits to 1 click per IP per 60 seconds
 - Filters bots/crawlers (skip click recording)
 - Records click events for analytics
+- Queues optional `click.created` webhooks in the background after recorded clicks
 - Returns 302 redirect with no-cache headers
 
 ### Database Security
@@ -214,7 +215,7 @@ npm run test:watch   # Watch mode
 
 ### Current Issues (Medium Priority)
 1. Detailed analytics use server-side aggregate RPCs, but very high-volume or long-range reporting will eventually want pre-aggregated rollups or caching
-2. `cloudflare-worker/` still needs production route/secret setup and has no dedicated automated test coverage yet
+2. Full deployed edge-to-webhook verification is still a manual smoke test rather than an automated production monitor
 
 ### Implemented (Shipped)
 - ✅ Password-protected links (PBKDF2-HMAC-SHA256 with legacy SHA-256 compatibility)
@@ -224,7 +225,7 @@ npm run test:watch   # Watch mode
 
 ### Planned Features (Q2 2026)
 - Team collaboration
-- Webhook integrations
+- Slack / Zapier integrations
 - Mobile apps (iOS/Android)
 
 See [project-roadmap.md](./docs/project-roadmap.md) for full details.
@@ -262,8 +263,8 @@ See [deployment-guide.md](./docs/deployment-guide.md) for detailed instructions.
 |--------|--------|--------|
 | Redirect Latency | <100ms | ~50ms (Cloudflare edge) |
 | Page Load | <2s | ~1.5s (Vercel CDN) |
-| Build Time | <30s | ~5s (clean, no warnings) |
-| Tests | — | 289/289 passing (20 files) |
+| Build Time | <30s | ~5s (passes; Vite chunk-size warning remains) |
+| Tests | — | 308/308 passing (25 files) |
 | Uptime | 99.9% | 100% (current) |
 
 ### Build Chunks (code-split)
@@ -318,6 +319,6 @@ Project by hthmkt12. See LICENSE file for details.
 
 ---
 
-**Last Updated**: 2026-03-16
-**Status**: Production-Ready MVP
+**Last Updated**: 2026-03-17
+**Status**: Production-Ready v1.7
 **Maintainer**: hthmkt12

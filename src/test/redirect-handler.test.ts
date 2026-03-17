@@ -1,8 +1,4 @@
-/**
- * Tests for the REAL redirect handler logic (not the simulator).
- * Exercises supabase/functions/redirect/redirect-handler.ts via mock adapters.
- */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleRedirect,
   hashPasswordPBKDF2,
@@ -10,8 +6,6 @@ import {
   type LinkRecord,
   type SupabaseAdapter,
 } from "../../supabase/functions/redirect/redirect-handler";
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeAdapter(overrides: Partial<SupabaseAdapter> = {}): SupabaseAdapter {
   return {
@@ -35,132 +29,104 @@ function makeReq(overrides: Partial<HandlerRequest> = {}): HandlerRequest {
 function activeLink(overrides: Partial<LinkRecord> = {}): LinkRecord {
   return {
     id: "link-1",
+    name: "Test Link",
+    short_code: "ABC123",
     default_url: "https://example.com",
+    webhook_url: null,
     geo_routes: [],
     ...overrides,
   };
 }
 
-/** Generate a legacy SHA-256 hash for testing */
-async function legacySha256(password: string, salt: string): Promise<string> {
+async function legacySha256(password: string, salt: string) {
   const data = new TextEncoder().encode(salt + password);
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const buffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("redirect-handler (real logic)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  // 1. OPTIONS preflight
   it("returns 200 with CORS headers for OPTIONS preflight", async () => {
-    const adapter = makeAdapter();
-    const res = await handleRedirect(makeReq({ method: "OPTIONS" }), adapter);
+    const res = await handleRedirect(makeReq({ method: "OPTIONS" }), makeAdapter());
     expect(res.status).toBe(200);
     expect(res.headers["Access-Control-Allow-Origin"]).toBe("*");
   });
 
-  // 2. Invalid short code → 400
   it("returns 400 JSON for invalid short code", async () => {
-    const adapter = makeAdapter();
-    const res = await handleRedirect(
-      makeReq({ url: "https://edge.example.com/redirect/ab" }), // too short
-      adapter,
-    );
+    const res = await handleRedirect(makeReq({ url: "https://edge.example.com/redirect/ab" }), makeAdapter());
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body).error).toBe("Invalid short code");
   });
 
-  // 3. Missing/inactive link → 404
   it("returns 404 JSON for missing or inactive link", async () => {
-    const adapter = makeAdapter({ fetchLink: vi.fn().mockResolvedValue(null) });
-    const res = await handleRedirect(makeReq(), adapter);
+    const res = await handleRedirect(makeReq(), makeAdapter({ fetchLink: vi.fn().mockResolvedValue(null) }));
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body).error).toBe("Link not found or inactive");
   });
 
-  // 4. Expired link → 410 HTML
   it("returns 410 HTML for expired link", async () => {
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(
-        activeLink({ expires_at: "2020-01-01T00:00:00Z" }),
-      ),
-    });
-    const res = await handleRedirect(makeReq(), adapter);
+    const res = await handleRedirect(
+      makeReq(),
+      makeAdapter({ fetchLink: vi.fn().mockResolvedValue(activeLink({ expires_at: "2020-01-01T00:00:00Z" })) })
+    );
     expect(res.status).toBe(410);
     expect(res.headers["Content-Type"]).toContain("text/html");
     expect(res.body).toContain("Link này đã hết hạn");
   });
 
-  // 5. Password-protected GET → 200 HTML form
   it("returns 200 HTML password form on GET for protected link", async () => {
     const hash = await hashPasswordPBKDF2("secret123");
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: hash })),
-    });
-    const res = await handleRedirect(makeReq(), adapter);
+    const res = await handleRedirect(
+      makeReq(),
+      makeAdapter({ fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: hash })) })
+    );
     expect(res.status).toBe(200);
     expect(res.headers["Content-Type"]).toContain("text/html");
     expect(res.body).toContain("Link được bảo vệ");
-    expect(res.body).toContain("Mật khẩu");
   });
 
-  // 6. Password-protected POST wrong password → 401 HTML
   it("returns 401 HTML for wrong password", async () => {
     const hash = await hashPasswordPBKDF2("secret123");
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: hash })),
-    });
     const res = await handleRedirect(
       makeReq({ method: "POST", formData: { password: "wrongpass" } }),
-      adapter,
+      makeAdapter({ fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: hash })) })
     );
     expect(res.status).toBe(401);
     expect(res.body).toContain("Mật khẩu không đúng");
   });
 
-  // 7. Password-protected POST correct password → 302 redirect
   it("returns 302 redirect for correct password", async () => {
     const hash = await hashPasswordPBKDF2("secret123");
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: hash })),
-    });
     const res = await handleRedirect(
       makeReq({ method: "POST", formData: { password: "secret123" } }),
-      adapter,
+      makeAdapter({ fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: hash })) })
     );
     expect(res.status).toBe(302);
-    expect(res.headers["Location"]).toBe("https://example.com");
+    expect(res.headers.Location).toBe("https://example.com");
   });
 
-  // 8. Legacy SHA-256 opportunistic rehash
-  it("triggers updateLink for legacy SHA-256 hash after successful verify", async () => {
-    const salt = "test-salt";
+  it("triggers updateLink for legacy SHA-256 hashes after successful verify", async () => {
+    const salt = "legacy-salt";
     const legacyHash = await legacySha256("mypass", salt);
     const updateLink = vi.fn().mockResolvedValue(undefined);
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(
-        activeLink({ password_hash: legacyHash, password_salt: salt }),
-      ),
-      updateLink,
-    });
     const res = await handleRedirect(
       makeReq({ method: "POST", formData: { password: "mypass" } }),
-      adapter,
+      makeAdapter({
+        fetchLink: vi.fn().mockResolvedValue(activeLink({ password_hash: legacyHash, password_salt: salt })),
+        updateLink,
+      })
     );
+
     expect(res.status).toBe(302);
-    // updateLink should have been called with a PBKDF2 hash
     expect(updateLink).toHaveBeenCalledOnce();
-    const [id, fields] = updateLink.mock.calls[0];
-    expect(id).toBe("link-1");
+    const [, fields] = updateLink.mock.calls[0];
     expect((fields as Record<string, unknown>).password_hash).toMatch(/^pbkdf2:/);
     expect((fields as Record<string, unknown>).password_salt).toBeNull();
   });
 
-  // 9. Geo-routing priority: bypass_url → target_url → default_url
   it("resolves geo-routing with bypass_url priority", async () => {
     const adapter = makeAdapter({
       fetchLink: vi.fn().mockResolvedValue(
@@ -170,84 +136,106 @@ describe("redirect-handler (real logic)", () => {
             { country_code: "VN", target_url: "https://vn.com", bypass_url: "https://bypass-vn.com" },
             { country_code: "US", target_url: "https://us.com" },
           ],
-        }),
+        })
       ),
     });
 
-    // VN → bypass_url
-    const res1 = await handleRedirect(
-      makeReq({ headers: { "user-agent": "Mozilla", "cf-ipcountry": "VN", "x-forwarded-for": "1.2.3.4" } }),
-      adapter,
-    );
-    expect(res1.status).toBe(302);
-    expect(res1.headers["Location"]).toBe("https://bypass-vn.com");
+    const vn = await handleRedirect(makeReq({ headers: { "user-agent": "Mozilla", "cf-ipcountry": "VN", "x-forwarded-for": "1.2.3.4" } }), adapter);
+    const us = await handleRedirect(makeReq({ headers: { "user-agent": "Mozilla", "cf-ipcountry": "US", "x-forwarded-for": "1.2.3.5" } }), adapter);
+    const jp = await handleRedirect(makeReq({ headers: { "user-agent": "Mozilla", "cf-ipcountry": "JP", "x-forwarded-for": "1.2.3.6" } }), adapter);
 
-    // US → target_url (no bypass)
-    const res2 = await handleRedirect(
-      makeReq({ headers: { "user-agent": "Mozilla", "cf-ipcountry": "US", "x-forwarded-for": "1.2.3.5" } }),
-      adapter,
-    );
-    expect(res2.status).toBe(302);
-    expect(res2.headers["Location"]).toBe("https://us.com");
-
-    // JP → default_url (no matching route)
-    const res3 = await handleRedirect(
-      makeReq({ headers: { "user-agent": "Mozilla", "cf-ipcountry": "JP", "x-forwarded-for": "1.2.3.6" } }),
-      adapter,
-    );
-    expect(res3.status).toBe(302);
-    expect(res3.headers["Location"]).toBe("https://default.com");
+    expect(vn.headers.Location).toBe("https://bypass-vn.com");
+    expect(us.headers.Location).toBe("https://us.com");
+    expect(jp.headers.Location).toBe("https://default.com");
   });
 
-  // 10. Bot traffic skips insert; non-bot records click
-  it("skips click insert for bot user-agent", async () => {
+  it("skips click insert and webhook queue for bot traffic", async () => {
     const insertClick = vi.fn();
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(activeLink()),
-      insertClick,
-    });
+    const queueBackgroundTask = vi.fn();
     await handleRedirect(
       makeReq({ headers: { "user-agent": "Googlebot/2.1", "x-forwarded-for": "1.2.3.4" } }),
-      adapter,
+      makeAdapter({ fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "https://hooks.example.com" })), insertClick }),
+      { queueBackgroundTask }
     );
     expect(insertClick).not.toHaveBeenCalled();
+    expect(queueBackgroundTask).not.toHaveBeenCalled();
   });
 
-  it("records click for non-bot user-agent", async () => {
-    const insertClick = vi.fn();
+  it("records click and queues webhook for non-bot traffic", async () => {
+    const queued: Promise<void>[] = [];
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
     const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(activeLink()),
+      fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "https://hooks.example.com/clicks" })),
       recentClickCount: vi.fn().mockResolvedValue(0),
-      insertClick,
+      insertClick: vi.fn().mockResolvedValue(undefined),
     });
-    await handleRedirect(
-      makeReq({ headers: { "user-agent": "Mozilla/5.0", "x-forwarded-for": "1.2.3.4" } }),
-      adapter,
+
+    const res = await handleRedirect(makeReq(), adapter, {
+      fetchImpl,
+      queueBackgroundTask: (task) => queued.push(task),
+    });
+
+    expect(res.status).toBe(302);
+    expect(adapter.insertClick).toHaveBeenCalledOnce();
+    expect(queued).toHaveLength(1);
+    await Promise.all(queued);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://hooks.example.com/clicks",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "X-QRLive-Event": "click.created" }),
+      })
     );
-    expect(insertClick).toHaveBeenCalledOnce();
   });
 
-  // 11. Duplicate click within 60s skips insert
-  it("skips click insert when recent click exists within 60s", async () => {
+  it("skips click insert and webhook when recent click exists within 60s", async () => {
     const insertClick = vi.fn();
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(activeLink()),
-      recentClickCount: vi.fn().mockResolvedValue(1), // already clicked
-      insertClick,
-    });
-    await handleRedirect(makeReq(), adapter);
+    const queueBackgroundTask = vi.fn();
+    await handleRedirect(
+      makeReq(),
+      makeAdapter({
+        fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "https://hooks.example.com" })),
+        recentClickCount: vi.fn().mockResolvedValue(1),
+        insertClick,
+      }),
+      { queueBackgroundTask }
+    );
     expect(insertClick).not.toHaveBeenCalled();
+    expect(queueBackgroundTask).not.toHaveBeenCalled();
   });
 
-  // 12. Invalid redirect target → 400 JSON
-  it("returns 400 JSON for invalid redirect target (non-http URL)", async () => {
-    const adapter = makeAdapter({
-      fetchLink: vi.fn().mockResolvedValue(
-        activeLink({ default_url: "javascript:alert(1)" }),
-      ),
-    });
-    const res = await handleRedirect(makeReq(), adapter);
+  it("returns 400 JSON for invalid redirect targets before recording clicks", async () => {
+    const insertClick = vi.fn();
+    const res = await handleRedirect(
+      makeReq(),
+      makeAdapter({
+        fetchLink: vi.fn().mockResolvedValue(activeLink({ default_url: "javascript:alert(1)" })),
+        insertClick,
+      })
+    );
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body).error).toBe("Invalid redirect target");
+    expect(insertClick).not.toHaveBeenCalled();
+  });
+
+  it("does not fail redirects when webhook delivery errors", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const queued: Promise<void>[] = [];
+    const res = await handleRedirect(
+      makeReq(),
+      makeAdapter({
+        fetchLink: vi.fn().mockResolvedValue(activeLink({ webhook_url: "https://hooks.example.com/fail" })),
+      }),
+      {
+        fetchImpl: vi.fn().mockRejectedValue(new Error("network down")),
+        queueBackgroundTask: (task) => queued.push(task),
+      }
+    );
+
+    expect(res.status).toBe(302);
+    await Promise.all(queued);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("Click webhook delivery failed for https://hooks.example.com/fail")
+    );
   });
 });

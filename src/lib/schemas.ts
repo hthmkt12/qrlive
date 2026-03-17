@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const webhookUrlSchema = z.preprocess(
+  (value) => typeof value === "string" ? value.trim() : value,
+  z.union([
+    z.literal(""),
+    z.string()
+      .url("Webhook URL không hợp lệ")
+      .refine(
+        (value) => /^https?:\/\//i.test(value),
+        "Webhook URL phải bắt đầu bằng http:// hoặc https://"
+      ),
+  ])
+);
+
 // Single geo route: country + target URL + optional bypass URL for geo-block evasion
 export const geoRouteSchema = z.object({
   country: z.string(),
@@ -13,17 +26,29 @@ export const linkFormSchema = z.object({
   name: z.string().min(1, "Tên không được để trống").max(100, "Tên quá dài"),
   defaultUrl: z.string().url("URL mặc định không hợp lệ"),
   geoRoutes: z.array(geoRouteSchema).default([]),
-  // Optional custom short code — empty string means auto-generate; normalized to uppercase
+  // Optional custom short code: empty string means auto-generate; normalized to uppercase
   customShortCode: z
     .string()
     .transform((v) => v.toUpperCase())
-    .pipe(z.string().regex(/^[A-Z0-9_-]{3,20}$/, "Short code chỉ chứa chữ, số, - hoặc _, 3–20 ký tự"))
+    .pipe(
+      z.string().regex(
+        /^[A-Z0-9_-]{3,20}$/,
+        "Short code chỉ chứa chữ, số, - hoặc _, dài 3-20 ký tự"
+      )
+    )
     .optional()
     .or(z.literal("")),
-  // Optional expiration date — ISO date string (YYYY-MM-DD) or empty string = no expiration
+  // Optional expiration date: ISO date string (YYYY-MM-DD) or empty string = no expiration
   expiresAt: z.string().optional().or(z.literal("")),
-  // Optional link password — min 4 chars if provided; empty string = no password / clear existing
-  linkPassword: z.string().min(4, "Mật khẩu tối thiểu 4 ký tự").max(100, "Mật khẩu quá dài").optional().or(z.literal("")),
+  // Optional link password: min 4 chars if provided; empty string = no password / clear existing
+  linkPassword: z
+    .string()
+    .min(4, "Mật khẩu tối thiểu 4 ký tự")
+    .max(100, "Mật khẩu quá dài")
+    .optional()
+    .or(z.literal("")),
+  // Optional click-event webhook: empty string disables notifications
+  webhookUrl: webhookUrlSchema.optional(),
 });
 
 // Login / Signup form
