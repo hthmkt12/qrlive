@@ -37,6 +37,7 @@ export function useCreateLink() {
       password,
       qrConfig,
       webhookUrl,
+      webhookSecret,
     }: {
       name: string;
       defaultUrl: string;
@@ -47,7 +48,8 @@ export function useCreateLink() {
       password?: string;
       qrConfig?: QrConfig | null;
       webhookUrl?: string;
-    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt, password, qrConfig, webhookUrl),
+      webhookSecret?: string;
+    }) => createLinkInDB(name, defaultUrl, geoRoutes, userId, customShortCode, expiresAt, password, qrConfig, webhookUrl, webhookSecret),
     onSuccess: () => {
       invalidateLinks();
       invalidateAnalytics();
@@ -64,6 +66,7 @@ export function useUpdateLink() {
       id,
       updates,
       password,
+      webhookSecret,
     }: {
       id: string;
       updates: {
@@ -75,7 +78,8 @@ export function useUpdateLink() {
         qr_config?: QrConfig | null;
       };
       password?: string; // undefined = no change; "" = clear; non-empty = set new
-    }) => updateLinkInDB(id, updates, password),
+      webhookSecret?: string; // undefined = no change; "" = clear; non-empty = set new
+    }) => updateLinkInDB(id, updates, password, webhookSecret),
     onSuccess: invalidate,
   });
 }

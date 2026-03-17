@@ -65,8 +65,53 @@ describe("analytics queries", () => {
     await fetchLinks();
 
     expect(supabase.from).toHaveBeenCalledWith("qr_links");
-    expect(select).toHaveBeenCalledWith("id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, qr_config, geo_routes(*)");
+    expect(select).toHaveBeenCalledWith("id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, has_webhook_secret, qr_config, geo_routes(*)");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
+  });
+
+  it("fetchLinks falls back when has_webhook_secret is not deployed yet", async () => {
+    const order = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: "42703", message: "column qr_links.has_webhook_secret does not exist" },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: "link-1",
+            user_id: "user-1",
+            name: "Fallback Link",
+            short_code: "ABC123",
+            default_url: "https://example.com",
+            webhook_url: null,
+            is_active: true,
+            created_at: "2026-03-17T00:00:00Z",
+            expires_at: null,
+            has_password: false,
+            qr_config: null,
+            geo_routes: [],
+          },
+        ],
+        error: null,
+      });
+    const select = vi.fn().mockReturnValue({ order });
+    vi.mocked(supabase.from).mockReturnValue({ select } as never);
+
+    await expect(fetchLinks()).resolves.toEqual([
+      expect.objectContaining({
+        id: "link-1",
+        has_webhook_secret: false,
+      }),
+    ]);
+    expect(select).toHaveBeenNthCalledWith(
+      1,
+      "id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, has_webhook_secret, qr_config, geo_routes(*)"
+    );
+    expect(select).toHaveBeenNthCalledWith(
+      2,
+      "id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, qr_config, geo_routes(*)"
+    );
   });
 
   it("fetchLinkAnalyticsSummaries uses the aggregate rpc and normalizes counts", async () => {

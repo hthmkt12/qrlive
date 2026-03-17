@@ -33,10 +33,12 @@ const EMPTY_FORM: LinkFormInput = {
   expiresAt: "",
   linkPassword: undefined,
   webhookUrl: "",
+  webhookSecret: undefined,
 };
 
 export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps) {
   const [clearPassword, setClearPassword] = useState(false);
+  const [clearSecret, setClearSecret] = useState(false);
   const qrConfigRef = useRef<QrConfig | null>(null);
   const { toast } = useToast();
   const updateLink = useUpdateLink();
@@ -73,6 +75,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
     });
     qrConfigRef.current = link.qr_config ?? null;
     setClearPassword(false);
+    setClearSecret(false);
   }, [link, open, reset]);
 
   if (!link) return null;
@@ -91,6 +94,7 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
           qr_config: qrConfigRef.current,
         },
         password: clearPassword ? "" : nextPassword || undefined,
+        webhookSecret: clearSecret ? "" : (data.webhookSecret?.trim() || undefined),
       });
       await updateGeoRoutes.mutateAsync({
         linkId: link.id,
@@ -186,6 +190,43 @@ export function EditLinkDialog({ link, open, onOpenChange }: EditLinkDialogProps
               Để trống nếu muốn tắt thông báo. QRLive chỉ gửi khi click hợp lệ được lưu vào analytics.
             </p>
             {errors.webhookUrl && <p className="text-xs text-destructive">{errors.webhookUrl.message}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <Label>
+              Webhook Secret <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span>
+            </Label>
+            <Input
+              type="password"
+              placeholder={link.has_webhook_secret ? "Nhập secret mới nếu muốn thay đổi" : "Tối thiểu 16 ký tự"}
+              {...register("webhookSecret")}
+              onChange={(event) => {
+                setClearSecret(false);
+                register("webhookSecret").onChange(event);
+              }}
+            />
+            {link.has_webhook_secret && (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {clearSecret ? "Secret hiện tại sẽ được xóa khi lưu." : "Để trống nếu không muốn thay đổi secret."}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setClearSecret(true);
+                    setValue("webhookSecret", "", { shouldDirty: true, shouldTouch: true });
+                  }}
+                >
+                  Xóa secret hiện tại
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Nếu có, QRLive sẽ ký payload bằng HMAC-SHA256 và gửi kèm header X-QRLive-Signature-256.
+            </p>
+            {errors.webhookSecret && <p className="text-xs text-destructive">{errors.webhookSecret.message}</p>}
           </div>
 
           <LinkGeoRoutesFields

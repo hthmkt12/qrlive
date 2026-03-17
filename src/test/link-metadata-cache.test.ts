@@ -10,6 +10,7 @@ function makeLink(overrides: Partial<LinkRecord> = {}): LinkRecord {
     short_code: "HOT123",
     default_url: "https://example.com",
     webhook_url: null,
+    webhook_secret: null,
     geo_routes: [],
     ...overrides,
   };

@@ -93,6 +93,13 @@ export const linkFormSchema = z.object({
     .or(z.literal("")),
   // Optional click-event webhook: empty string disables notifications
   webhookUrl: webhookUrlSchema.optional(),
+  // Optional HMAC secret for webhook signature: min 16 chars if provided; empty = no secret / clear
+  webhookSecret: z
+    .string()
+    .min(16, "Secret tối thiểu 16 ký tự")
+    .max(256, "Secret quá dài")
+    .optional()
+    .or(z.literal("")),
 });
 
 // Login / Signup form

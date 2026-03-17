@@ -28,6 +28,7 @@ const DEFAULT_VALUES: LinkFormInput = {
   expiresAt: "",
   linkPassword: "",
   webhookUrl: "",
+  webhookSecret: "",
 };
 
 export function CreateLinkDialog() {
@@ -81,6 +82,7 @@ export function CreateLinkDialog() {
         password: data.linkPassword || undefined,
         qrConfig: qrConfigRef.current,
         webhookUrl: data.webhookUrl || undefined,
+        webhookSecret: data.webhookSecret || undefined,
       });
       handleOpenChange(false);
       toast({ title: "Đã tạo link thành công! 🎉" });
@@ -160,6 +162,17 @@ export function CreateLinkDialog() {
               QRLive sẽ gửi POST khi click hợp lệ được ghi nhận, không gửi cho bot hoặc click trùng trong 60 giây.
             </p>
             {errors.webhookUrl && <p className="text-xs text-destructive">{errors.webhookUrl.message}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <Label>
+              Webhook Secret <span className="text-xs font-normal text-muted-foreground">(tùy chọn)</span>
+            </Label>
+            <Input type="password" placeholder="Tối thiểu 16 ký tự" {...register("webhookSecret")} />
+            <p className="text-xs text-muted-foreground">
+              Nếu có, QRLive sẽ ký payload bằng HMAC-SHA256 và gửi kèm header X-QRLive-Signature-256.
+            </p>
+            {errors.webhookSecret && <p className="text-xs text-destructive">{errors.webhookSecret.message}</p>}
           </div>
 
           <LinkGeoRoutesFields

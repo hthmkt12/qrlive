@@ -226,6 +226,7 @@ describe("createLinkInDB", () => {
         webhook_url: null,
       })
     );
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("webhook_secret");
   });
 
   it("stores webhook_url when provided", async () => {
@@ -260,6 +261,42 @@ describe("createLinkInDB", () => {
 
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({ webhook_url: "https://hooks.example.com/qrlive" })
+    );
+  });
+
+  it("stores webhook_secret when provided", async () => {
+    const { select: collisionSelect } = mockGenerateShortCode();
+    const single = vi.fn().mockResolvedValue({
+      data: { id: "link-1", name: "Test", webhook_url: null },
+      error: null,
+    });
+    const selectAfterInsert = vi.fn().mockReturnValue({ single });
+    const insert = vi.fn().mockReturnValue({ select: selectAfterInsert });
+
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "qr_links") {
+        const callCount = vi.mocked(supabase.from).mock.calls.filter((c) => c[0] === "qr_links").length;
+        if (callCount <= 1) return { select: collisionSelect } as never;
+        return { insert } as never;
+      }
+      return {} as never;
+    });
+
+    await createLinkInDB(
+      "Test",
+      "https://example.com",
+      [],
+      "user-1",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "https://hooks.example.com/qrlive",
+      "webhook-secret-1234"
+    );
+
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ webhook_secret: "webhook-secret-1234" })
     );
   });
 

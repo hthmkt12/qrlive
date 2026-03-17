@@ -8,15 +8,45 @@ import type {
   LinkAnalyticsDetailRow,
 } from "./models";
 
-export async function fetchLinks(): Promise<QRLinkRow[]> {
-  const { data, error } = await supabase
-    .from("qr_links")
-    // has_password is a server-side generated column — password_hash is never selected here
-    .select("id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, qr_config, geo_routes(*)")
-    .order("created_at", { ascending: false });
+const LINK_LIST_SELECT =
+  "id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, qr_config, geo_routes(*)";
+const LINK_LIST_SELECT_WITH_WEBHOOK_SECRET =
+  "id, user_id, name, short_code, default_url, webhook_url, is_active, created_at, expires_at, has_password, has_webhook_secret, qr_config, geo_routes(*)";
 
-  if (error) throw error;
-  return (data ?? []) as unknown as QRLinkRow[];
+type PostgrestErrorLike = {
+  code?: string;
+  message?: string;
+};
+
+function isMissingGeneratedColumn(error: PostgrestErrorLike | null, columnName: string) {
+  return error?.code === "42703" && error.message?.includes(columnName);
+}
+
+async function selectLinks(selectClause: string) {
+  return supabase
+    .from("qr_links")
+    .select(selectClause)
+    .order("created_at", { ascending: false });
+}
+
+export async function fetchLinks(): Promise<QRLinkRow[]> {
+  const { data, error } = await selectLinks(LINK_LIST_SELECT_WITH_WEBHOOK_SECRET);
+
+  if (!error) {
+    return (data ?? []) as unknown as QRLinkRow[];
+  }
+
+  if (!isMissingGeneratedColumn(error, "has_webhook_secret")) {
+    throw error;
+  }
+
+  const fallback = await selectLinks(LINK_LIST_SELECT);
+  if (fallback.error) throw fallback.error;
+
+  return (fallback.data ?? []).map((row) => ({
+    ...(row as QRLinkRow),
+    has_webhook_secret: false,
+  })) as QRLinkRow[];
 }
 
 export async function fetchLinkAnalyticsSummaries(

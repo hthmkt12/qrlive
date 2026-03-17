@@ -71,11 +71,29 @@ export function buildClickWebhookPayload({
   };
 }
 
+/** Compute HMAC-SHA256 signature over `timestamp.body` using Web Crypto */
+export async function signWebhookPayload(secret: string, timestamp: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const data = encoder.encode(`${timestamp}.${body}`);
+  const signature = await crypto.subtle.sign("HMAC", key, data);
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export async function dispatchClickWebhook(
   url: string,
   payload: ClickWebhookPayload,
   fetchImpl: typeof fetch = fetch,
-  resolveDnsImpl?: ResolveDnsFn
+  resolveDnsImpl?: ResolveDnsFn,
+  secret?: string
 ) {
   const target = validateWebhookUrl(url);
   await assertWebhookUrlResolvesPublicIp(target, resolveDnsImpl);
@@ -83,14 +101,25 @@ export async function dispatchClickWebhook(
   const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
   try {
+    const body = JSON.stringify(payload);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-QRLive-Event": payload.event,
+      "X-QRLive-Version": String(payload.version),
+    };
+
+    // Add HMAC signature headers when secret is available
+    if (secret) {
+      const timestamp = new Date().toISOString();
+      const signature = await signWebhookPayload(secret, timestamp, body);
+      headers["X-QRLive-Timestamp"] = timestamp;
+      headers["X-QRLive-Signature-256"] = `sha256=${signature}`;
+    }
+
     const response = await fetchImpl(target.toString(), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-QRLive-Event": payload.event,
-        "X-QRLive-Version": String(payload.version),
-      },
-      body: JSON.stringify(payload),
+      headers,
+      body,
       signal: controller.signal,
     });
 

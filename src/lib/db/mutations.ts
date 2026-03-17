@@ -29,7 +29,8 @@ export async function createLinkInDB(
   expiresAt?: string | null,
   password?: string,
   qrConfig?: QrConfig | null,
-  webhookUrl?: string | null
+  webhookUrl?: string | null,
+  webhookSecret?: string | null
 ): Promise<QRLinkRow> {
   let shortCode: string;
 
@@ -57,19 +58,25 @@ export async function createLinkInDB(
     passwordHash = await hashPassword(password);
   }
 
+  const insertPayload = {
+    name,
+    short_code: shortCode,
+    default_url: defaultUrl,
+    user_id: userId,
+    expires_at: expiresAt || null,
+    password_hash: passwordHash,
+    password_salt: null,
+    qr_config: qrConfig ?? null,
+    webhook_url: webhookUrl ?? null,
+  };
+
+  if (webhookSecret && webhookSecret.trim() !== "") {
+    Object.assign(insertPayload, { webhook_secret: webhookSecret });
+  }
+
   const { data: link, error } = await supabase
     .from("qr_links")
-    .insert({
-      name,
-      short_code: shortCode,
-      default_url: defaultUrl,
-      user_id: userId,
-      expires_at: expiresAt || null,
-      password_hash: passwordHash,
-      password_salt: null,
-      qr_config: qrConfig ?? null,
-      webhook_url: webhookUrl ?? null,
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
@@ -110,7 +117,8 @@ export async function updateLinkInDB(
     expires_at?: string | null;
     qr_config?: QrConfig | null;
   },
-  password?: string // undefined = no change; "" = clear password; non-empty = set new password
+  password?: string, // undefined = no change; "" = clear password; non-empty = set new password
+  webhookSecret?: string // undefined = no change; "" = clear secret; non-empty = set new secret
 ) {
   // Build password fields based on the password param
   let passwordFields: { password_hash: string | null; password_salt: string | null } | undefined;
@@ -123,7 +131,15 @@ export async function updateLinkInDB(
     passwordFields = { password_hash: hash, password_salt: null };
   }
 
-  const payload = passwordFields ? { ...updates, ...passwordFields } : updates;
+  // Build webhook secret field based on the webhookSecret param
+  let secretField: { webhook_secret: string | null } | undefined;
+  if (webhookSecret === "") {
+    secretField = { webhook_secret: null };
+  } else if (webhookSecret && webhookSecret.trim() !== "") {
+    secretField = { webhook_secret: webhookSecret };
+  }
+
+  const payload = { ...updates, ...passwordFields, ...secretField };
   const { data, error } = await supabase
     .from("qr_links")
     .update(payload)

@@ -40,6 +40,7 @@ describe("CSV export sanitization", () => {
       short_code: "SAFE12",
       default_url: "https://example.com",
       webhook_url: null,
+      has_webhook_secret: false,
       is_active: true,
       created_at: "2026-03-16T00:00:00Z",
       expires_at: null,

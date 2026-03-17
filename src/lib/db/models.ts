@@ -16,6 +16,8 @@ export interface QRLinkRow {
   short_code: string;
   default_url: string;
   webhook_url: string | null;
+  // Server-side generated column: true when webhook_secret IS NOT NULL
+  has_webhook_secret: boolean;
   is_active: boolean;
   created_at: string;
   expires_at: string | null;

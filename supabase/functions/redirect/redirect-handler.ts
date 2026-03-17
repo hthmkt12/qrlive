@@ -21,6 +21,7 @@ export interface LinkRecord {
   short_code: string;
   default_url: string;
   webhook_url?: string | null;
+  webhook_secret?: string | null;
   expires_at?: string | null;
   password_hash?: string | null;
   password_salt?: string | null;
@@ -86,7 +87,8 @@ function queueWebhook(link: LinkRecord, countryCode: string, referer: string, re
       shortCode: link.short_code,
     }),
     options.fetchImpl,
-    options.resolveDnsImpl
+    options.resolveDnsImpl,
+    link.webhook_secret ?? undefined
   ).catch((error) => reportClickWebhookError(link.webhook_url!, error));
 
   if (options.queueBackgroundTask) {

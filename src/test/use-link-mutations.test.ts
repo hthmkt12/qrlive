@@ -56,6 +56,7 @@ const mockLink: QRLinkRow = {
   short_code: "ABC123",
   default_url: "https://example.com",
   webhook_url: null,
+  has_webhook_secret: false,
   is_active: true,
   created_at: "2024-01-01T00:00:00Z",
   expires_at: null,
@@ -95,6 +96,7 @@ describe("useCreateLink", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       undefined
     );
   });
@@ -121,6 +123,7 @@ describe("useCreateLink", () => {
       [],
       "user-1",
       "MYCODE",
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -152,7 +155,8 @@ describe("useCreateLink", () => {
       undefined,
       undefined,
       undefined,
-      "https://hooks.example.com/qrlive"
+      "https://hooks.example.com/qrlive",
+      undefined
     );
   });
 
@@ -209,7 +213,7 @@ describe("useUpdateLink", () => {
       await result.current.mutateAsync({ id: "link-1", updates: { name: "New Name" } });
     });
 
-    expect(mockUpdateLinkInDB).toHaveBeenCalledWith("link-1", { name: "New Name" }, undefined);
+    expect(mockUpdateLinkInDB).toHaveBeenCalledWith("link-1", { name: "New Name" }, undefined, undefined);
   });
 
   it("invalidates links query on success", async () => {
@@ -241,6 +245,7 @@ describe("useUpdateLink", () => {
     expect(mockUpdateLinkInDB).toHaveBeenCalledWith(
       "link-1",
       { webhook_url: "https://hooks.example.com/qrlive" },
+      undefined,
       undefined
     );
   });

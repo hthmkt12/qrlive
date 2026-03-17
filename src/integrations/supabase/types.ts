@@ -99,6 +99,7 @@ export type Database = {
           default_url: string
           expires_at: string | null
           has_password: boolean | null
+          has_webhook_secret: boolean | null
           id: string
           is_active: boolean
           name: string
@@ -108,6 +109,7 @@ export type Database = {
           short_code: string
           updated_at: string
           user_id: string | null
+          webhook_secret: string | null
           webhook_url: string | null
         }
         Insert: {
@@ -115,6 +117,7 @@ export type Database = {
           default_url: string
           expires_at?: string | null
           has_password?: boolean | null
+          has_webhook_secret?: boolean | null
           id?: string
           is_active?: boolean
           name: string
@@ -124,6 +127,7 @@ export type Database = {
           short_code: string
           updated_at?: string
           user_id?: string | null
+          webhook_secret?: string | null
           webhook_url?: string | null
         }
         Update: {
@@ -131,6 +135,7 @@ export type Database = {
           default_url?: string
           expires_at?: string | null
           has_password?: boolean | null
+          has_webhook_secret?: boolean | null
           id?: string
           is_active?: boolean
           name?: string
@@ -140,6 +145,7 @@ export type Database = {
           short_code?: string
           updated_at?: string
           user_id?: string | null
+          webhook_secret?: string | null
           webhook_url?: string | null
         }
         Relationships: []

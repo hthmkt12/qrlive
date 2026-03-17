@@ -4,6 +4,7 @@ import {
   dispatchClickWebhook,
   redactWebhookUrl,
   reportClickWebhookError,
+  signWebhookPayload,
   validateWebhookUrl,
 } from "../../supabase/functions/redirect/click-webhook";
 
@@ -143,5 +144,65 @@ describe("click webhook helpers", () => {
     expect(consoleError).toHaveBeenCalledWith(
       "Click webhook delivery failed for https://hooks.example.com/...: network down"
     );
+  });
+
+  it("includes HMAC signature headers when secret is provided", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    const resolveDnsImpl = vi.fn().mockResolvedValue(["93.184.216.34"]);
+    const secret = "my-super-secret-key-16";
+    const payload = buildClickWebhookPayload({
+      countryCode: "US",
+      defaultUrl: "https://example.com",
+      linkId: "link-1",
+      linkName: "Launch",
+      occurredAt: "2026-03-17T10:00:00.000Z",
+      redirectUrl: "https://example.com",
+      referer: "direct",
+      shortCode: "LAUNCH",
+    });
+
+    await dispatchClickWebhook(
+      "https://hooks.example.com/clicks",
+      payload,
+      fetchImpl,
+      resolveDnsImpl,
+      secret
+    );
+
+    const [, init] = fetchImpl.mock.calls[0];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-QRLive-Timestamp"]).toBeDefined();
+    expect(headers["X-QRLive-Signature-256"]).toMatch(/^sha256=[a-f0-9]{64}$/);
+
+    // verify signature correctness
+    const body = init.body as string;
+    const timestamp = headers["X-QRLive-Timestamp"];
+    const expected = await signWebhookPayload(secret, timestamp, body);
+    expect(headers["X-QRLive-Signature-256"]).toBe(`sha256=${expected}`);
+  });
+
+  it("does NOT include signature headers when secret is undefined", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    const resolveDnsImpl = vi.fn().mockResolvedValue(["93.184.216.34"]);
+    await dispatchClickWebhook(
+      "https://hooks.example.com/clicks",
+      buildClickWebhookPayload({
+        countryCode: "US",
+        defaultUrl: "https://example.com",
+        linkId: "link-1",
+        linkName: "Launch",
+        occurredAt: "2026-03-17T10:00:00.000Z",
+        redirectUrl: "https://example.com",
+        referer: "direct",
+        shortCode: "LAUNCH",
+      }),
+      fetchImpl,
+      resolveDnsImpl
+    );
+
+    const [, init] = fetchImpl.mock.calls[0];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-QRLive-Timestamp"]).toBeUndefined();
+    expect(headers["X-QRLive-Signature-256"]).toBeUndefined();
   });
 });

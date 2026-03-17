@@ -33,6 +33,7 @@ function activeLink(overrides: Partial<LinkRecord> = {}): LinkRecord {
     short_code: "ABC123",
     default_url: "https://example.com",
     webhook_url: null,
+    webhook_secret: null,
     geo_routes: [],
     ...overrides,
   };
@@ -268,5 +269,31 @@ describe("redirect-handler (real logic)", () => {
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringContaining("Click webhook delivery failed for https://hooks.example.com/...")
     );
+  });
+
+  it("passes webhook_secret to dispatchClickWebhook when present on link", async () => {
+    const queued: Promise<void>[] = [];
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+    const resolveDnsImpl = vi.fn().mockResolvedValue(["93.184.216.34"]);
+    const adapter = makeAdapter({
+      fetchLink: vi.fn().mockResolvedValue(
+        activeLink({ webhook_url: "https://hooks.example.com/clicks", webhook_secret: "test-secret-at-least-16" })
+      ),
+      recentClickCount: vi.fn().mockResolvedValue(0),
+      insertClick: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const res = await handleRedirect(makeReq(), adapter, {
+      fetchImpl,
+      queueBackgroundTask: (task) => queued.push(task),
+      resolveDnsImpl,
+    });
+
+    expect(res.status).toBe(302);
+    await Promise.all(queued);
+    const [, init] = fetchImpl.mock.calls[0];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-QRLive-Timestamp"]).toBeDefined();
+    expect(headers["X-QRLive-Signature-256"]).toMatch(/^sha256=[a-f0-9]{64}$/);
   });
 });

@@ -29,6 +29,7 @@ const mockLinks = [
     short_code: "ABC123",
     default_url: "https://example.com",
     webhook_url: null,
+    has_webhook_secret: false,
     is_active: true,
     created_at: "2026-03-15T00:00:00Z",
     expires_at: null,
