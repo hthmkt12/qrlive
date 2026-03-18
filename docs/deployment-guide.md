@@ -597,35 +597,29 @@ QR codes mặc định trỏ đến `supabase.co` — có thể bị block bởi
 ### Cách hoạt động
 
 ```
-QR Code → r.yourdomain.com/CODE   ← custom domain (accessible từ TQ)
-               ↓ proxy
-          supabase.co/functions/v1/redirect/CODE
-               ↓ geo-routing
-          Target URL
+QR Code → r.worldgate.space/CODE   ← Cloudflare custom domain
+             ↓ proxy
+        supabase.co/functions/v1/redirect/CODE
+             ↓ geo-routing
+        Target URL
 ```
 
 Proxy **phải forward `cf-ipcountry` header** để geo-routing tiếp tục hoạt động đúng.
 
-### Option A: Cloudflare Workers (miễn phí, không guaranteed ở TQ ~70%)
+### Option A: Cloudflare Workers (current production redirect host)
 
 ```bash
-# 1. Edit cloudflare-worker/redirect-proxy.js — set env var SUPABASE_REDIRECT_URL
-# 2. Deploy
+# 1. Deploy the preconfigured Worker binding
 npm install -g wrangler
 wrangler login
-wrangler deploy cloudflare-worker/redirect-proxy.js \
-  --name qrlive-redirect \
-  --route "r.yourdomain.com/*"
+wrangler deploy --config cloudflare-worker/wrangler.toml
 
-# 3. Set secrets in Wrangler
-wrangler secret put SUPABASE_REDIRECT_URL
-# Paste: https://ybxmpuirarncxmenprzf.supabase.co/functions/v1/redirect
-
-# 4. Set env var trong Vercel
-VITE_REDIRECT_BASE_URL=https://r.yourdomain.com
+# 2. Set env var trong Vercel
+VITE_REDIRECT_BASE_URL=https://r.worldgate.space
 ```
 
-**Note**: Cloudflare Worker hardcoded redirect URL removed; now uses `env.SUPABASE_REDIRECT_URL` for flexibility.
+`cloudflare-worker/wrangler.toml` binds `r.worldgate.space` as a Cloudflare custom domain.
+This does not require buying a new domain when you already control a Cloudflare-managed zone; a subdomain on that zone is enough.
 
 ### Option B: Alibaba Cloud Function Compute (100% accessible từ TQ)
 
@@ -708,11 +702,16 @@ curl -sf https://jp.company.com/health
 # Deploy
 supabase secrets set PROXY_SECRET=your-random-secret
 supabase secrets set PROXY_ALLOWED_HOSTS=www.company.com
+supabase secrets set PROXY_ANON_KEY=<same value as VITE_SUPABASE_PUBLISHABLE_KEY>
 supabase functions deploy proxy --no-verify-jwt
 
 # bypass_url format:
 # https://PROJECT.supabase.co/functions/v1/proxy?url=https://www.company.com/page&key=SECRET
 ```
+
+`PROXY_ANON_KEY` is the recommended runtime override on this project because the deployed function did not reliably read `SUPABASE_ANON_KEY` via `Deno.env.get()`.
+
+On shared `supabase.co` domains, managed Supabase may rewrite proxied `text/html` GET responses to `text/plain`, so this fallback is not a clean replacement for the Fly.io gateway when exact browser-facing HTML headers matter.
 
 **Warning:** `supabase.co` may itself be blocked by GFW. Use Japan VPS for production.
 
@@ -791,11 +790,12 @@ curl https://qrlive-jp-proxy.fly.dev/health
 
 `fly.toml` keeps `min_machines_running = 1` and `auto_stop_machines = "off"` so the gateway stays always-on for QR traffic.
 
-**GFW block recovery** (switch to Singapore standby):
+**GFW block recovery** (move the same Fly app to Singapore and keep the hostname stable):
 ```bash
 flyctl regions set sin --app qrlive-jp-proxy && flyctl deploy --app qrlive-jp-proxy
-# Or flip DNS to pre-created qrlive-sg-proxy app + bulk SQL update bypass_url
 ```
+
+Create a separate Singapore standby app later only if lower-RTO failover is actually needed.
 
 ### Configure bypass_url in QRLive
 

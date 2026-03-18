@@ -242,11 +242,26 @@ paths:
       operationId: getFallbackProxy
       summary: Fetch an allowlisted upstream URL through the fallback proxy
       description: |
-        This endpoint is fallback or testing only. It requires an Authorization
-        bearer token that matches PROXY_SECRET and only serves hosts listed in
-        PROXY_ALLOWED_HOSTS.
+        Fallback / testing-only content proxy. Requires dual authentication:
+        1. `Authorization: Bearer <SUPABASE_ANON_KEY>` header
+        2. `key` query parameter matching `PROXY_SECRET` (constant-time compared)
+
+        Uses `redirect: "manual"` — upstream redirects are validated against the
+        allowlist and passed through as 3xx + Location rather than followed.
+        Max response size: 6 MB. Timeout: 25 s.
+        CORS restricted to `PROXY_ALLOWED_ORIGIN` (default: https://qrlive.vercel.app).
+
+        > **Limitation:** Plain browser redirects cannot attach a custom
+        > `Authorization` header, so this endpoint is best suited to scripted or
+        > mediated callers unless another component injects the header.
+        >
+        > **Managed Supabase limitation:** On shared `supabase.co` domains, `GET`
+        > responses with upstream `text/html` content may be rewritten to
+        > `text/plain`. Use Fly.io Phase 1 or a custom domain for exact HTML
+        > passthrough.
       security:
-        - ProxyBearerAuth: []
+        - SupabaseAnonKey: []
+          ProxySecretKey: []
       parameters:
         - in: query
           name: url
@@ -255,9 +270,18 @@ paths:
           schema:
             type: string
             format: uri
+        - in: query
+          name: key
+          required: true
+          description: Secret key constant-time compared against PROXY_SECRET
+          schema:
+            type: string
       responses:
         "200":
-          description: Upstream content streamed back to the caller
+          description: |
+            Upstream content returned to the caller.
+            On shared `supabase.co` domains, HTML GET responses may be rewritten
+            to `text/plain` by the platform even when upstream headers are correct.
           content:
             application/octet-stream:
               schema:
@@ -274,10 +298,14 @@ paths:
           $ref: "#/components/responses/ProxyUnauthorized"
         "403":
           $ref: "#/components/responses/ProxyForbidden"
+        "413":
+          $ref: "#/components/responses/ProxyTooLarge"
         "500":
           $ref: "#/components/responses/ProxyConfigError"
         "502":
           $ref: "#/components/responses/ProxyFailure"
+        "504":
+          $ref: "#/components/responses/ProxyTimeout"
     options:
       tags: [Fallback Proxy]
       operationId: optionsFallbackProxy
@@ -312,10 +340,16 @@ webhooks:
 
 components:
   securitySchemes:
-    ProxyBearerAuth:
+    SupabaseAnonKey:
       type: http
       scheme: bearer
-      bearerFormat: PROXY_SECRET
+      bearerFormat: SUPABASE_ANON_KEY
+      description: Supabase anon key passed as Authorization Bearer header
+    ProxySecretKey:
+      type: apiKey
+      in: query
+      name: key
+      description: Secret key constant-time compared against PROXY_SECRET env var
   parameters:
     ShortCode:
       in: path
@@ -534,7 +568,7 @@ components:
               value:
                 error: Invalid URL
     ProxyUnauthorized:
-      description: Missing or invalid PROXY_SECRET bearer token
+      description: Missing or invalid Authorization bearer token or proxy key
       content:
         application/json:
           schema:
@@ -558,10 +592,26 @@ components:
           example:
             error: PROXY_ALLOWED_HOSTS not configured
     ProxyFailure:
-      description: Upstream fetch failed or timed out
+      description: Upstream fetch failed or returned a bad redirect
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/JsonErrorBody"
           example:
             error: Proxy fetch failed
+    ProxyTooLarge:
+      description: Upstream response exceeds the 6 MB size limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Response too large
+    ProxyTimeout:
+      description: Upstream fetch exceeded the 25 s timeout
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JsonErrorBody"
+          example:
+            error: Upstream timeout

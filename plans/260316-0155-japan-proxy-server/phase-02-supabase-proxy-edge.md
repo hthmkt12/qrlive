@@ -10,180 +10,121 @@ effort: 2h
 
 ## Context Links
 
-- [Redirect edge function](../../supabase/functions/redirect/index.ts)
+- [Proxy handler](../../supabase/functions/proxy/proxy-handler.ts)
+- [Deno entry point](../../supabase/functions/proxy/index.ts)
+- [Tests](../../src/test/proxy-edge-function.test.ts)
 - [plan.md](./plan.md)
 
 ## Overview
 
-Zero-infrastructure alternative: a new Supabase Edge Function that fetches a target URL and returns the content directly. No VPS needed — Supabase infrastructure handles everything.
+Zero-infrastructure alternative: a Supabase Edge Function that fetches a target URL and returns the content directly. No VPS needed — Supabase infrastructure handles everything.
 
 **IMPORTANT CAVEAT:** Supabase domains (`supabase.co`) may themselves be blocked or throttled in China. This approach is a fallback, not the primary recommendation.
 
-## Requirements
+> **Limitation:** Plain browser redirects cannot attach a custom `Authorization` header, so this endpoint is best suited to scripted or mediated callers unless another component injects the header.
 
-### Functional
-- New edge function at `/functions/v1/proxy`
-- Query params: `url` (target URL), `key` (secret)
-- Fetches target URL server-side, streams response back
-- Allowlist of permitted hosts via env var
-- Passes through Content-Type, Content-Length headers
+## Implemented Contract
 
-### Non-Functional
-- Max response size: 6MB (Supabase edge function limit)
-- Timeout: 25s (Deno Deploy limit)
-- Security: secret key + host allowlist
+### Endpoint
 
-## Architecture
+`GET /functions/v1/proxy?url=<target>&key=<PROXY_SECRET>`
 
-```
-CN user -> bypass_url points to:
-  https://PROJECT.supabase.co/functions/v1/proxy?url=https://www.company.com/page&key=SECRET
-    -> Edge function fetches www.company.com/page
-      -> Returns content to user
-```
+### Authentication (dual)
 
-## Edge Function Template
+1. `Authorization: Bearer <SUPABASE_ANON_KEY>` header (required by callers)
+2. `key` query parameter matching `PROXY_SECRET` (constant-time compared)
 
-```typescript
-// supabase/functions/proxy/index.ts
+> Runtime note: on this project the deployed function validates that bearer value with
+> `PROXY_ANON_KEY` first, then falls back to `SUPABASE_ANON_KEY` if the runtime exposes it.
 
-// [F12-FIXED] Restrict CORS to QRLive origin — wildcard allows any site to read proxied responses
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://qrlive.vercel.app",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+### Security
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+- **Host allowlist**: `PROXY_ALLOWED_HOSTS` — comma-separated; if empty/missing → 500 JSON
+- **SSRF protection**: private/loopback IPs blocked via regex
+- **CORS**: restricted to `PROXY_ALLOWED_ORIGIN` (default: `https://qrlive.vercel.app`)
+- Includes `Access-Control-Allow-Methods: GET, OPTIONS`
 
-  try {
-    const url = new URL(req.url);
-    const targetUrl = url.searchParams.get("url");
-    // key is now in Authorization header (see auth check above — `key` query param removed)
+### Redirect Handling
 
-    // [F2-FIXED] Secret should come from Authorization header, NOT query param
-    // Query params appear in logs, browser history, QR codes, and the geo_routes DB column
-    const authHeader = req.headers.get("Authorization");
-    const proxySecret = Deno.env.get("PROXY_SECRET");
-    if (!authHeader || authHeader !== `Bearer ${proxySecret}`) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+- `fetch(..., { redirect: "manual" })`
+- If upstream returns 3xx without `Location` → 502 JSON
+- If redirect target host is allowlisted → pass through 3xx + Location
+- If redirect target host is not allowlisted → 403 JSON
 
-    // Validate target URL
-    if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
-      return new Response(JSON.stringify({ error: "Invalid URL" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+### Limits
 
-    // Allowlist check
-    const allowedHosts = (Deno.env.get("PROXY_ALLOWED_HOSTS") || "")
-      .split(",")
-      .map((h) => h.trim().toLowerCase())
-      .filter(Boolean);
+- **Max response size**: 6 MB — checked via `Content-Length` (413 JSON), or buffer up to 6 MB if absent
+- **Timeout**: 25 s via `AbortController` → 504 JSON
 
-    const targetHost = new URL(targetUrl).hostname.toLowerCase();
-    if (!allowedHosts.includes(targetHost)) {
-      return new Response(JSON.stringify({ error: "Host not allowed" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+### Response Passthrough
 
-    // [F1-FIXED] Do NOT follow redirects — an allowlisted origin could redirect to internal IPs (SSRF)
-    const response = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": "QRLive-Proxy/1.0",
-        Accept: req.headers.get("Accept") || "*/*",
-      },
-      redirect: "manual", // returns opaqueredirect; caller sees 3xx
-    });
+- Best-effort passthrough for `Content-Type` and `Content-Length`
+- All error responses are JSON `{ "error": "..." }`
+- Successful responses include `Cache-Control: no-store`
 
-    // Re-validate redirect target before following
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("Location");
-      if (!location) {
-        return new Response(JSON.stringify({ error: "Bad redirect" }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const redirectHost = new URL(location, targetUrl).hostname.toLowerCase();
-      if (!allowedHosts.includes(redirectHost)) {
-        return new Response(JSON.stringify({ error: "Redirect target not allowed" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      // Safe to follow — return the Location for the client to navigate
-      return new Response(null, { status: response.status, headers: { Location: location } });
-    }
+### Managed Supabase HTML Limitation
 
-    // Stream response back
-    const headers = new Headers(corsHeaders);
-    const contentType = response.headers.get("Content-Type");
-    if (contentType) headers.set("Content-Type", contentType);
-    const contentLength = response.headers.get("Content-Length");
-    if (contentLength) headers.set("Content-Length", contentLength);
-
-    // No caching — content may change
-    headers.set("Cache-Control", "no-store");
-
-    return new Response(response.body, {
-      status: response.status,
-      headers,
-    });
-  } catch (error) {
-    console.error("Proxy error:", error);
-    return new Response(JSON.stringify({ error: "Proxy fetch failed" }), {
-      status: 502,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-});
-```
+- On managed Supabase, `GET` edge functions that return `text/html` are rewritten to `text/plain` unless served behind a custom domain.
+- This means HTML proxy responses may lose exact `Content-Type` / `Content-Length` passthrough even when upstream headers are correct.
+- For exact browser-facing HTML passthrough, prefer Phase 1 (`proxy-gateway` on Fly.io) or a custom domain in front of the function.
 
 ## Environment Variables
 
 ```bash
-# Set via Supabase dashboard or CLI
+# Required
 supabase secrets set PROXY_SECRET=your-random-secret-key-here
 supabase secrets set PROXY_ALLOWED_HOSTS=www.company.com,site2.company.com
+# Optional (defaults to https://qrlive.vercel.app)
+supabase secrets set PROXY_ALLOWED_ORIGIN=https://qrlive.vercel.app
+# Runtime auth fallback (recommended on this project)
+supabase secrets set PROXY_ANON_KEY=<same value as VITE_SUPABASE_PUBLISHABLE_KEY>
+# The function prefers PROXY_ANON_KEY and falls back to SUPABASE_ANON_KEY if available.
 ```
 
 ## Deployment
 
 ```bash
-# [F7-FIXED] Do NOT use --no-verify-jwt; the redirect edge function must pass a Supabase service role token
-# in the Authorization header when calling this proxy function
-supabase functions deploy proxy
+supabase functions deploy proxy --no-verify-jwt
+# Or via npx if global CLI unavailable:
+npx -y supabase functions deploy proxy --no-verify-jwt
 ```
 
-## Implementation Steps
+## Architecture
 
-1. Create `supabase/functions/proxy/index.ts` with above template
-2. Set `PROXY_SECRET` and `PROXY_ALLOWED_HOSTS` env vars
-3. Deploy: `supabase functions deploy proxy --no-verify-jwt`
-4. Test: `curl "https://PROJECT.supabase.co/functions/v1/proxy?url=https://www.company.com&key=SECRET"`
-5. Set bypass_url in QRLive to the full proxy URL
+```
+Proxy handler: supabase/functions/proxy/proxy-handler.ts  (testable, ~200 LOC)
+Deno wrapper:  supabase/functions/proxy/index.ts          (env vars, ~40 LOC)
+Tests:         src/test/proxy-edge-function.test.ts       (14 smoke tests)
+```
 
-## Limitations (Be Honest)
+## Response Codes
+
+| Code | Meaning |
+|------|---------|
+| 200  | Upstream content returned |
+| 3xx  | Allowlisted upstream redirect passed through |
+| 400  | Invalid or missing `url` param |
+| 401  | Missing/wrong `Authorization` header or `key` param |
+| 403  | Host or redirect target not in allowlist |
+| 413  | Response exceeds 6 MB |
+| 500  | `PROXY_ALLOWED_HOSTS` not configured |
+| 502  | Upstream fetch failed or bad redirect |
+| 504  | Upstream timeout (25 s) |
+
+## Limitations
 
 | Limitation | Impact |
 |-----------|--------|
 | Supabase may be blocked in China | Defeats the purpose — Phase 1 is more reliable |
-| 6MB response size limit | Large pages or file downloads may fail |
-| 25s timeout | Slow origin servers may timeout |
+| 6 MB response size limit | Large pages or file downloads may fail |
+| 25 s timeout | Slow origin servers may timeout |
 | No cookie forwarding | Auth-dependent pages won't work |
 | HTML link rewriting not included | Relative URLs in HTML will break |
 | Single request model | No WebSocket, no streaming video |
 | Cost at scale | Edge function invocations cost money beyond free tier |
+| Browser redirect limitation | Cannot attach Authorization header via plain redirect |
+| Runtime env caveat | On this project, `PROXY_ANON_KEY` was required because `SUPABASE_ANON_KEY` was not readable via `Deno.env.get()` after deploy |
+| Managed Supabase HTML rewrite | `GET` HTML responses are rewritten to `text/plain` unless served behind a custom domain |
 
 ## When to Use This Instead of Phase 1
 
@@ -192,18 +133,14 @@ supabase functions deploy proxy
 - Supabase domain is confirmed accessible from target region
 - Don't want to manage any infrastructure
 
-## Security Considerations
-
-- Secret key prevents unauthorized use
-- Host allowlist prevents open proxy abuse
-- No URL parameter injection (parsed via `new URL()`)
-- Rate limiting inherited from Supabase edge function limits
-
 ## Success Criteria
 
-- [ ] Edge function deployed and responding
-- [ ] Unauthorized requests (wrong/missing key) return 401
-- [ ] Non-allowlisted hosts return 403
-- [ ] Allowlisted target content proxied correctly
-- [ ] Content-Type header preserved
-- [ ] Works from test client (may not work from China if Supabase blocked)
+- [x] Edge function deployed and responding
+- [x] Unauthorized requests (wrong/missing key or header) return 401
+- [x] Non-allowlisted hosts return 403
+- [x] Allowlisted target content proxied correctly
+- [x] Handler preserves upstream `Content-Type` / `Content-Length` in tests
+- [x] Managed Supabase HTML rewrite documented as a platform limitation for live GET HTML traffic
+- [x] Oversize responses return 413
+- [x] Timeout returns 504
+- [x] 14 smoke tests pass
