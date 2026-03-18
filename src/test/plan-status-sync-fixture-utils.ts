@@ -20,6 +20,13 @@ export async function createPlanStatusSyncFixtureWorkspace() {
     });
   }
 
+  // Seed Japan proxy plan: uncheck one checkbox in phase-03 so runner derives "in-progress"
+  // (tests verify the runner correctly downgrades plan.md status from completed → in-progress)
+  const japanPhase03 = path.join(workspaceDir, "plans", "260316-0155-japan-proxy-server", "phase-03-integration-guide.md");
+  const phase03Content = await fs.readFile(japanPhase03, "utf8");
+  // Replace only the first checked box [x] → [ ] to make phase "in-progress"
+  await fs.writeFile(japanPhase03, phase03Content.replace("[x]", "[ ]"), "utf8");
+
   await fs.copyFile(
     path.join(process.cwd(), "docs", "project-roadmap.md"),
     path.join(workspaceDir, "docs", "project-roadmap.md")
