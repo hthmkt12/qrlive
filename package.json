@@ -16,6 +16,7 @@
     "plan:sync-status": "node scripts/plan-status-sync/index.js",
     "plan:sync-status:write": "node scripts/plan-status-sync/index.js --write",
     "preview": "vite preview",
+    "smoke:cn": "node scripts/cn-bypass-smoke.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

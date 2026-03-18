@@ -42,3 +42,5 @@ plans/antigravity-bridge/
 coverage/
 test-results/
 playwright-report/
+
+.vercel
