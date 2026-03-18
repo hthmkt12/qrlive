@@ -37,18 +37,50 @@ export function extractShortCode(pathname) {
 }
 
 /**
+ * Resolve the best country code available for geo-routing.
+ * Cloudflare stores the real value on request.cf.country, not on an incoming header.
+ * @param {Headers} incoming
+ * @param {string | undefined} cfCountry
+ * @returns {string | null}
+ */
+export function resolveCountryHeader(incoming, cfCountry) {
+  const forwarded = incoming.get("cf-ipcountry");
+  if (forwarded) return forwarded;
+  if (cfCountry && typeof cfCountry === "string") return cfCountry;
+  return null;
+}
+
+/**
+ * Read Cloudflare geolocation safely.
+ * Some runtimes may not expose request.cf consistently, so never let this crash the worker.
+ * @param {Request} request
+ * @returns {string | undefined}
+ */
+export function readCloudflareCountry(request) {
+  try {
+    const country = request?.cf?.country;
+    return typeof country === "string" && country ? country : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Build upstream headers preserving geo-routing and content-type info.
  * Injects Supabase auth headers.
  * @param {Headers} incoming
  * @param {string} anonKey
+ * @param {string | undefined} cfCountry
  * @returns {Headers}
  */
-export function buildUpstreamHeaders(incoming, anonKey) {
+export function buildUpstreamHeaders(incoming, anonKey, cfCountry) {
   const headers = new Headers();
+  const country = resolveCountryHeader(incoming, cfCountry);
 
-  // Preserve geo-routing and client info headers
+  // Preserve client info headers that are safe to forward to Supabase.
+  // Cloudflare-managed cf-* headers are not reliable on Worker subrequests,
+  // so geo-routing should use x-geo-country instead.
   const preserve = [
-    "cf-ipcountry",
     "cf-connecting-ip",
     "x-real-ip",
     "x-forwarded-for",
@@ -61,6 +93,7 @@ export function buildUpstreamHeaders(incoming, anonKey) {
     const val = incoming.get(key);
     if (val) headers.set(key, val);
   }
+  if (country) headers.set("x-geo-country", country);
 
   // Supabase auth
   headers.set("apikey", anonKey);
@@ -71,63 +104,73 @@ export function buildUpstreamHeaders(incoming, anonKey) {
 
 export default {
   async fetch(request, env) {
-    const { SUPABASE_URL, SUPABASE_ANON_KEY } = env;
+    try {
+      const { SUPABASE_URL, SUPABASE_ANON_KEY } = env;
 
-    // Guard: fail fast if secrets missing
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      const missing = [];
-      if (!SUPABASE_URL) missing.push("SUPABASE_URL");
-      if (!SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
-      return new Response(
-        JSON.stringify({ error: `Missing required secrets: ${missing.join(", ")}` }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
-      );
-    }
+      // Guard: fail fast if secrets missing
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        const missing = [];
+        if (!SUPABASE_URL) missing.push("SUPABASE_URL");
+        if (!SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
+        return new Response(
+          JSON.stringify({ error: `Missing required secrets: ${missing.join(", ")}` }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
 
-    // CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
-      });
-    }
+      // CORS preflight
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          },
+        });
+      }
 
-    // Only GET and POST allowed
-    if (request.method !== "GET" && request.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
+      // Only GET and POST allowed
+      if (request.method !== "GET" && request.method !== "POST") {
+        return new Response(JSON.stringify({ error: "Method not allowed" }), {
+          status: 405,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const url = new URL(request.url);
+      const shortCode = extractShortCode(url.pathname);
+
+      if (!shortCode) {
+        return new Response(JSON.stringify({ error: "Short code required" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Build upstream URL
+      const targetUrl = `${SUPABASE_URL}/functions/v1/redirect/${shortCode}`;
+      const headers = buildUpstreamHeaders(request.headers, SUPABASE_ANON_KEY, readCloudflareCountry(request));
+
+      // Forward request, including body for POST (password-protected links)
+      const fetchOpts = {
+        method: request.method,
+        headers,
+        redirect: "manual",
+      };
+      if (request.method === "POST") {
+        fetchOpts.body = request.body;
+      }
+
+      const response = await fetch(targetUrl, fetchOpts);
+      return response;
+    } catch (error) {
+      console.error("Worker proxy failed:", error);
+      return new Response(JSON.stringify({
+        error: "Worker proxy failed",
+      }), {
+        status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }
-
-    const url = new URL(request.url);
-    const shortCode = extractShortCode(url.pathname);
-
-    if (!shortCode) {
-      return new Response(JSON.stringify({ error: "Short code required" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Build upstream URL
-    const targetUrl = `${SUPABASE_URL}/functions/v1/redirect/${shortCode}`;
-    const headers = buildUpstreamHeaders(request.headers, SUPABASE_ANON_KEY);
-
-    // Forward request, including body for POST (password-protected links)
-    const fetchOpts = {
-      method: request.method,
-      headers,
-      redirect: "manual",
-    };
-    if (request.method === "POST") {
-      fetchOpts.body = request.body;
-    }
-
-    const response = await fetch(targetUrl, fetchOpts);
-    return response;
   },
 };

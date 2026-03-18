@@ -14,6 +14,8 @@ All significant changes, features, and fixes documented here.
 - Optional Redis caching for hot public links in the redirect edge function, plus authenticated cache invalidation after dashboard link edits, toggles, geo-route changes, and deletes
 
 ### Fixed
+- Bound the Cloudflare redirect Worker to `r.worldgate.space` as a real custom-domain trigger instead of relying on `*.workers.dev`
+- Switched Worker geo forwarding to stable `x-geo-country` propagation so Supabase redirect logic still receives country data after the custom-domain hop
 - Hardened click webhooks by rejecting localhost, IP-literal, and non-public hostnames before the redirect edge function issues outbound fetches
 - Tightened webhook security further by requiring HTTPS, redacting webhook URLs in delivery logs, and rejecting hostnames whose DNS resolves to private or reserved IP space
 - Completed Redis cache invalidation preflight headers so browser-triggered purge requests do not silently fail on CORS
@@ -23,6 +25,8 @@ All significant changes, features, and fixes documented here.
 ### Improved
 - Added first-class `npm run test:coverage` support in repo scripts and expanded Vitest coverage to include redirect/cache helpers plus the Cloudflare Worker
 - Added regression tests for browser-side Redis cache invalidation and analytics export actions, lifting visibility into cache/webhook/analytics V2 quality after recent feature work
+- Documented that a Cloudflare-managed zone/subdomain is enough for Worker binding, but live geo-routing still needs verification beyond the hostname cutover
+- Verified live smoke on `r.worldgate.space`: a VN geo-route now records `country_code = "VN"` and redirects to the Fly.io bypass gateway when `bypass_url` is configured
 
 ### Planned Features
 - User guide

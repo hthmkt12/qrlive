@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { extractShortCode, buildUpstreamHeaders } from "./redirect-proxy.js";
+import { extractShortCode, buildUpstreamHeaders, readCloudflareCountry, resolveCountryHeader } from "./redirect-proxy.js";
 
 // --- extractShortCode ---
 
@@ -27,6 +27,32 @@ describe("extractShortCode", () => {
 
 // --- buildUpstreamHeaders ---
 
+describe("resolveCountryHeader", () => {
+  it("prefers an incoming cf-ipcountry header when present", () => {
+    expect(resolveCountryHeader(new Headers({ "cf-ipcountry": "VN" }), "US")).toBe("VN");
+  });
+
+  it("falls back to Cloudflare request.cf.country when header is missing", () => {
+    expect(resolveCountryHeader(new Headers(), "US")).toBe("US");
+  });
+});
+
+describe("readCloudflareCountry", () => {
+  it("returns request.cf.country when available", () => {
+    expect(readCloudflareCountry({ cf: { country: "SG" } })).toBe("SG");
+  });
+
+  it("returns undefined when request.cf access throws", () => {
+    const req = {};
+    Object.defineProperty(req, "cf", {
+      get() {
+        throw new Error("cf unavailable");
+      },
+    });
+    expect(readCloudflareCountry(req)).toBeUndefined();
+  });
+});
+
 describe("buildUpstreamHeaders", () => {
   it("injects apikey and Authorization from anonKey", () => {
     const result = buildUpstreamHeaders(new Headers(), "test-key");
@@ -34,9 +60,15 @@ describe("buildUpstreamHeaders", () => {
     expect(result.get("Authorization")).toBe("Bearer test-key");
   });
 
-  it("preserves cf-ipcountry for geo-routing", () => {
+  it("maps an incoming cf-ipcountry header to x-geo-country", () => {
     const result = buildUpstreamHeaders(new Headers({ "cf-ipcountry": "VN" }), "k");
-    expect(result.get("cf-ipcountry")).toBe("VN");
+    expect(result.get("x-geo-country")).toBe("VN");
+    expect(result.get("cf-ipcountry")).toBeNull();
+  });
+
+  it("uses Cloudflare country metadata when incoming header is absent", () => {
+    const result = buildUpstreamHeaders(new Headers(), "k", "US");
+    expect(result.get("x-geo-country")).toBe("US");
   });
 
   it("preserves user-agent and content-type", () => {
@@ -99,13 +131,27 @@ describe("proxy forwarding contract", () => {
     expect(opts.headers.get("Authorization")).toBe("Bearer anon-key-123");
   });
 
-  it("preserves cf-ipcountry header for geo-routing", async () => {
+  it("maps cf-ipcountry into x-geo-country for upstream geo-routing", async () => {
     const req = new Request("https://r.example.com/GEO", {
       headers: new Headers({ "cf-ipcountry": "CN" }),
     });
     await worker.fetch(req, ENV);
     const [, opts] = fetchSpy.mock.calls[0];
-    expect(opts.headers.get("cf-ipcountry")).toBe("CN");
+    expect(opts.headers.get("x-geo-country")).toBe("CN");
+    expect(opts.headers.get("cf-ipcountry")).toBeNull();
+  });
+
+  it("forwards request.cf.country when client headers do not include cf-ipcountry", async () => {
+    const req = new Request("https://r.example.com/GEO", {
+      headers: new Headers(),
+    });
+    Object.defineProperty(req, "cf", {
+      value: { country: "US" },
+      configurable: true,
+    });
+    await worker.fetch(req, ENV);
+    const [, opts] = fetchSpy.mock.calls[0];
+    expect(opts.headers.get("x-geo-country")).toBe("US");
   });
 
   it("forwards POST body for password-protected requests", async () => {

@@ -6,11 +6,12 @@
 #   wrangler secret put SUPABASE_ANON_KEY
 
 name = "qrlive-redirect"
+account_id = "75adc0ed2db47e1731c8f6105492cc0b"
 main = "redirect-proxy.js"
 compatibility_date = "2024-01-01"
 
-# Route: bind to your custom domain
-# Uncomment and fill in before deploying:
-# [[routes]]
-# pattern = "r.yourdomain.com/*"
-# zone_name = "yourdomain.com"
+# Production hostname for geo-aware QR redirects.
+[[routes]]
+pattern = "r.worldgate.space"
+zone_name = "worldgate.space"
+custom_domain = true
