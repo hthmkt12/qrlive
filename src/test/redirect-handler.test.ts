@@ -150,6 +150,25 @@ describe("redirect-handler (real logic)", () => {
     expect(jp.headers.Location).toBe("https://default.com");
   });
 
+  it("uses x-geo-country when cf-ipcountry is unavailable", async () => {
+    const adapter = makeAdapter({
+      fetchLink: vi.fn().mockResolvedValue(
+        activeLink({
+          default_url: "https://default.com",
+          geo_routes: [{ country_code: "US", target_url: "https://us.com", bypass_url: "https://bypass-us.com" }],
+        }),
+      ),
+    });
+
+    const res = await handleRedirect(
+      makeReq({ headers: { "user-agent": "Mozilla", "x-geo-country": "us", "x-forwarded-for": "1.2.3.4" } }),
+      adapter,
+    );
+
+    expect(res.status).toBe(302);
+    expect(res.headers.Location).toBe("https://bypass-us.com");
+  });
+
   it("skips click insert and webhook queue for bot traffic", async () => {
     const insertClick = vi.fn();
     const queueBackgroundTask = vi.fn();
@@ -295,5 +314,64 @@ describe("redirect-handler (real logic)", () => {
     const headers = init.headers as Record<string, string>;
     expect(headers["X-QRLive-Timestamp"]).toBeDefined();
     expect(headers["X-QRLive-Signature-256"]).toMatch(/^sha256=[a-f0-9]{64}$/);
+  });
+
+  describe("bypass_url allowlist", () => {
+    const geoLink = (bypassUrl: string) =>
+      activeLink({
+        default_url: "https://default.com",
+        geo_routes: [{ country_code: "VN", target_url: "https://vn.com", bypass_url: bypassUrl }],
+      });
+
+    const vnHeaders = { "user-agent": "Mozilla", "cf-ipcountry": "VN", "x-forwarded-for": "1.2.3.4" };
+
+    it("allows all bypass URLs when bypassUrlAllowlist is undefined", async () => {
+      const res = await handleRedirect(
+        makeReq({ headers: vnHeaders }),
+        makeAdapter({ fetchLink: vi.fn().mockResolvedValue(geoLink("https://bypass-vn.com/page")) }),
+      );
+      expect(res.status).toBe(302);
+      expect(res.headers.Location).toBe("https://bypass-vn.com/page");
+    });
+
+    it("allows all bypass URLs when bypassUrlAllowlist is empty", async () => {
+      const res = await handleRedirect(
+        makeReq({ headers: vnHeaders }),
+        makeAdapter({ fetchLink: vi.fn().mockResolvedValue(geoLink("https://bypass-vn.com/page")) }),
+        { bypassUrlAllowlist: [] },
+      );
+      expect(res.status).toBe(302);
+      expect(res.headers.Location).toBe("https://bypass-vn.com/page");
+    });
+
+    it("uses bypass_url when hostname is in the allowlist", async () => {
+      const res = await handleRedirect(
+        makeReq({ headers: vnHeaders }),
+        makeAdapter({ fetchLink: vi.fn().mockResolvedValue(geoLink("https://bypass-vn.com/page")) }),
+        { bypassUrlAllowlist: ["bypass-vn.com", "other.com"] },
+      );
+      expect(res.status).toBe(302);
+      expect(res.headers.Location).toBe("https://bypass-vn.com/page");
+    });
+
+    it("falls back to target_url when bypass hostname is NOT in the allowlist", async () => {
+      const res = await handleRedirect(
+        makeReq({ headers: vnHeaders }),
+        makeAdapter({ fetchLink: vi.fn().mockResolvedValue(geoLink("https://bypass-vn.com/page")) }),
+        { bypassUrlAllowlist: ["allowed.com"] },
+      );
+      expect(res.status).toBe(302);
+      expect(res.headers.Location).toBe("https://vn.com");
+    });
+
+    it("matches hostnames case-insensitively", async () => {
+      const res = await handleRedirect(
+        makeReq({ headers: vnHeaders }),
+        makeAdapter({ fetchLink: vi.fn().mockResolvedValue(geoLink("https://Bypass-VN.COM/page")) }),
+        { bypassUrlAllowlist: ["bypass-vn.com"] },
+      );
+      expect(res.status).toBe(302);
+      expect(res.headers.Location).toBe("https://Bypass-VN.COM/page");
+    });
   });
 });

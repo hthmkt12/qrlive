@@ -68,10 +68,18 @@ async function toHandlerRequest(req: Request): Promise<HandlerRequest> {
   return { method: req.method, url: req.url, headers, formData };
 }
 
+/** Parse BYPASS_URL_ALLOWLIST env var into normalized hostname array. */
+function parseBypassUrlAllowlist(): string[] | undefined {
+  const raw = Deno.env.get("BYPASS_URL_ALLOWLIST") ?? "";
+  const entries = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return entries.length > 0 ? entries : undefined;
+}
+
 Deno.serve(async (req) => {
   const adapter = withLinkMetadataCache(createAdapter(), createLinkMetadataCache());
   const handlerReq = await toHandlerRequest(req);
   const result = await handleRedirect(handlerReq, adapter, {
+    bypassUrlAllowlist: parseBypassUrlAllowlist(),
     queueBackgroundTask: (task) => {
       if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
         EdgeRuntime.waitUntil(task);

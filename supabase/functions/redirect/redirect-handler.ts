@@ -43,6 +43,8 @@ export interface RedirectRuntimeOptions {
   fetchImpl?: typeof fetch;
   queueBackgroundTask?: (task: Promise<void>) => void;
   resolveDnsImpl?: ResolveDnsFn;
+  /** Comma-parsed hostnames; undefined/empty = allow all bypass URLs (backward-compatible). */
+  bypassUrlAllowlist?: string[];
 }
 
 export const CORS_HEADERS: Record<string, string> = {
@@ -58,10 +60,23 @@ const EXPIRED_HTML =
   "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Link đã hết hạn</title></head>" +
   "<body><h1>Link này đã hết hạn</h1><p>Link bạn truy cập đã hết hạn và không còn hoạt động.</p></body></html>";
 
-export function resolveTarget(defaultUrl: string, countryCode: string, geoRoutes: GeoRoute[]): string {
+/** Returns true when the bypass URL's hostname is on the allowlist, or no allowlist is enforced. */
+export function isHostnameAllowed(url: string, allowlist?: string[]): boolean {
+  if (!allowlist || allowlist.length === 0) return true;
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return allowlist.includes(hostname);
+  } catch {
+    return false; // Unparseable URL → silently disallowed when allowlist is active.
+  }
+}
+
+export function resolveTarget(defaultUrl: string, countryCode: string, geoRoutes: GeoRoute[], bypassAllowlist?: string[]): string {
   if (!countryCode || geoRoutes.length === 0) return defaultUrl;
   const route = geoRoutes.find((entry) => entry.country_code.toUpperCase() === countryCode);
-  return route ? route.bypass_url || route.target_url : defaultUrl;
+  if (!route) return defaultUrl;
+  if (route.bypass_url && isHostnameAllowed(route.bypass_url, bypassAllowlist)) return route.bypass_url;
+  return route.target_url;
 }
 
 async function recordClick(adapter: SupabaseAdapter, linkId: string, ip: string, countryCode: string, userAgent: string, referer: string) {
@@ -103,7 +118,7 @@ function getRequestContext(headers: Record<string, string>) {
     userAgent: headers["user-agent"] || "",
     referer: (headers.referer || "direct").substring(0, 500),
     ip: headers["x-forwarded-for"]?.split(",")[0]?.trim() || headers["cf-connecting-ip"] || "unknown",
-    countryCode: (headers["cf-ipcountry"] || "").toUpperCase(),
+    countryCode: (headers["cf-ipcountry"] || headers["x-geo-country"] || "").toUpperCase(),
   };
 }
 
@@ -137,7 +152,7 @@ export async function handleRedirect(req: HandlerRequest, adapter: SupabaseAdapt
     }
 
     const { countryCode, ip, referer, userAgent } = getRequestContext(req.headers);
-    const targetUrl = resolveTarget(link.default_url, countryCode, link.geo_routes ?? []);
+    const targetUrl = resolveTarget(link.default_url, countryCode, link.geo_routes ?? [], options.bypassUrlAllowlist);
     if (!/^https?:\/\//i.test(targetUrl)) {
       return { status: 400, headers: JSON_HEADERS, body: JSON.stringify({ error: "Invalid redirect target" }) };
     }
