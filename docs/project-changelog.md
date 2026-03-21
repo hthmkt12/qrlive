@@ -27,6 +27,7 @@ All significant changes, features, and fixes documented here.
 - Added regression tests for browser-side Redis cache invalidation and analytics export actions, lifting visibility into cache/webhook/analytics V2 quality after recent feature work
 - Documented that a Cloudflare-managed zone/subdomain is enough for Worker binding, but live geo-routing still needs verification beyond the hostname cutover
 - Verified live smoke on `r.worldgate.space`: a VN geo-route now records `country_code = "VN"` and redirects to the Fly.io bypass gateway when `bypass_url` is configured
+- Right-sized the Fly.io `proxy-gateway` to the cheapest pinned always-on shared VM (`shared-cpu-1x`, `256mb`) and documented that the same Fly hostname must be preserved so existing `bypass_url` links keep resolving
 
 ### Planned Features
 - User guide

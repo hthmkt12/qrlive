@@ -40,6 +40,8 @@ Bypass URL: https://jp.yourdomain.com/page
 
 ## Deployment notes
 
-- `fly.toml.example` keeps one machine always on
+- keep the same Fly app / public hostname so existing `bypass_url` links keep working
+- keep one machine always on for QR reliability; do not enable auto-stop on the live bypass path
+- `fly.toml` and `fly.toml.example` pin the gateway to `shared-cpu-1x` with `256mb`; bump to `512mb` only if monitoring shows memory pressure
 - set secrets in Fly for the proxy credentials if they are not embedded in `OUTBOUND_PROXY_URL`
 - keep one gateway per origin host unless you intentionally want to multiplex traffic

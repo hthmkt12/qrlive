@@ -453,7 +453,7 @@ Three paths handle cross-border access for QR scans and destination content:
 | Path | Role | Canonical? |
 |---|---|---|
 | `cloudflare-worker/redirect-proxy.js` | **Redirect-domain gateway** — routes `r.yourdomain.com/CODE` → Supabase redirect edge function, preserving `cf-ipcountry` and all request headers. | ✅ Yes — production redirect layer |
-| `proxy-gateway/` | **Destination-content bypass** — always-on Node.js service (Fly.io Tokyo) that forwards `bypass_url` traffic to `UPSTREAM_ORIGIN` via optional HTTP/SOCKS5 vendor proxy, rewrites `Location` headers. | ✅ Yes — production bypass layer |
+| `proxy-gateway/` | **Destination-content bypass** — always-on Node.js service (Fly.io Tokyo) that forwards `bypass_url` traffic to `UPSTREAM_ORIGIN` via optional HTTP/SOCKS5 vendor proxy, rewrites `Location` headers, and is pinned to the cheapest viable always-on Fly VM to control cost without changing live bypass URLs. | ✅ Yes — production bypass layer |
 | `supabase/functions/proxy/index.ts` | **Content-fetch proxy** — same bypass intent but runs on Supabase Edge; `supabase.co` may itself be blocked by GFW. | ❌ Fallback/testing only |
 
 ```
@@ -464,6 +464,8 @@ QR scan flow (CN):
         → jp.yourdomain.com/page          (proxy-gateway on Fly.io)
           → origin server                 (via vendor proxy)
 ```
+
+Keep the same Fly app / public hostname for the bypass gateway. Existing `bypass_url` rows point to that host directly and do not auto-migrate if you deploy a new Fly app name.
 
 ## Performance & Optimization
 

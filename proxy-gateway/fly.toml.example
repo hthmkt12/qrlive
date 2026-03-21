@@ -1,4 +1,4 @@
-app = "qrlive-proxy-gateway"
+app = "qrlive-jp-974628"
 primary_region = "nrt"
 
 [build]
@@ -6,6 +6,10 @@ primary_region = "nrt"
 
 [env]
   PORT = "8080"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
 
 [http_service]
   internal_port = 8080

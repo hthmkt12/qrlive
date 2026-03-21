@@ -769,30 +769,30 @@ Required env vars:
 
 ### Deploy on Fly.io (primary approach)
 
-`proxy-gateway/fly.toml` is pre-configured for `nrt` (Tokyo) with app name `qrlive-jp-proxy`.
+`proxy-gateway/fly.toml` is pre-configured for `nrt` (Tokyo) with app name `qrlive-jp-974628`, pinned to the lowest-cost always-on shared VM (`shared-cpu-1x`, `256mb`).
 
 ```bash
 # 1. Create Fly.io app (one-time)
 flyctl auth login
-flyctl apps create qrlive-jp-proxy --machines
+flyctl apps create qrlive-jp-974628 --machines
 
 # 2. Set required secret
-flyctl secrets set UPSTREAM_ORIGIN=https://www.company.com --app qrlive-jp-proxy
+flyctl secrets set UPSTREAM_ORIGIN=https://www.company.com --app qrlive-jp-974628
 
 # 3. Deploy from proxy-gateway/ directory
 cd proxy-gateway
-flyctl deploy --app qrlive-jp-proxy
+flyctl deploy --app qrlive-jp-974628
 
 # 4. Verify health
-curl https://qrlive-jp-proxy.fly.dev/health
+curl https://qrlive-jp-974628.fly.dev/health
 # Expected: {"status":"ok","proxyMode":"direct"}
 ```
 
-`fly.toml` keeps `min_machines_running = 1` and `auto_stop_machines = "off"` so the gateway stays always-on for QR traffic.
+`fly.toml` keeps `min_machines_running = 1` and `auto_stop_machines = "off"` so the gateway stays always-on for QR traffic. Keep the same Fly app and hostname so existing `bypass_url` records continue to resolve. The default sizing target is `shared-cpu-1x` with `256mb`; move to `512mb` only if Fly metrics show memory pressure or restarts.
 
 **GFW block recovery** (move the same Fly app to Singapore and keep the hostname stable):
 ```bash
-flyctl regions set sin --app qrlive-jp-proxy && flyctl deploy --app qrlive-jp-proxy
+flyctl regions set sin --app qrlive-jp-974628 && flyctl deploy --app qrlive-jp-974628
 ```
 
 Create a separate Singapore standby app later only if lower-RTO failover is actually needed.

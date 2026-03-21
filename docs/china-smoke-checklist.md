@@ -14,7 +14,7 @@ Validate that a real China user can open the QR wrapper URL on production and be
 ## Create a Production Smoke Link
 
 ```bash
-npm run smoke:cn -- create --country CN --target-url https://example.com/cn-target --bypass-url https://qrlive-jp-proxy.fly.dev/
+npm run smoke:cn -- create --country CN --target-url https://example.com/cn-target --bypass-url https://qrlive-jp-974628.fly.dev/
 ```
 
 Save the output:
@@ -38,7 +38,7 @@ Save the output:
 ## Expected Result
 
 - The wrapper URL is reachable from China.
-- The final destination host is the configured `bypass_url` host, for example `qrlive-jp-proxy.fly.dev`.
+- The final destination host is the configured `bypass_url` host, for example `qrlive-jp-974628.fly.dev`.
 - The user does not fall back to the default target URL.
 
 ## Verify Analytics Back in QRLive
