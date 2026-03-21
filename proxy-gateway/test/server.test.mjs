@@ -123,6 +123,59 @@ test("gateway forwards requests and rewrites upstream redirects", async (t) => {
   assert.equal(redirectResponse.headers.get("location"), `${gatewayBaseUrl}/next`);
 });
 
+test("gateway returns 504 when upstream times out", async (t) => {
+  const upstream = createServer(() => {
+    // intentionally never respond to trigger timeout
+  });
+
+  t.after(() => stopServer(upstream));
+  const upstreamBaseUrl = await startServer(upstream);
+
+  const gateway = createProxyGatewayServer({
+    port: 0,
+    requestTimeoutMs: 50,
+    maxRedirects: 0,
+    upstreamOrigin: new URL(upstreamBaseUrl),
+    outboundProxyUrl: null,
+  });
+
+  t.after(() => stopServer(gateway));
+  const gatewayBaseUrl = await startServer(gateway);
+
+  const response = await fetch(`${gatewayBaseUrl}/timeout`);
+  const payload = await response.json();
+
+  assert.equal(response.status, 504);
+  assert.equal(payload.error, "UPSTREAM_PROXY_FAILED");
+});
+
+test("gateway returns 502 when upstream connection closes unexpectedly", async (t) => {
+  const upstream = createServer((req, res) => {
+    req.socket.destroy();
+    res.end();
+  });
+
+  t.after(() => stopServer(upstream));
+  const upstreamBaseUrl = await startServer(upstream);
+
+  const gateway = createProxyGatewayServer({
+    port: 0,
+    requestTimeoutMs: 200,
+    maxRedirects: 0,
+    upstreamOrigin: new URL(upstreamBaseUrl),
+    outboundProxyUrl: null,
+  });
+
+  t.after(() => stopServer(gateway));
+  const gatewayBaseUrl = await startServer(gateway);
+
+  const response = await fetch(`${gatewayBaseUrl}/connection-closed`);
+  const payload = await response.json();
+
+  assert.equal(response.status, 502);
+  assert.equal(payload.error, "UPSTREAM_PROXY_FAILED");
+});
+
 test("config validation and proxy agent selection support vendor proxy urls", () => {
   const config = loadConfig({
     UPSTREAM_ORIGIN: "https://www.company.com",

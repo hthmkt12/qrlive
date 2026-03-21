@@ -1,0 +1,50 @@
+name: Proxy Gateway CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "proxy-gateway/**"
+      - ".github/workflows/proxy-gateway-ci.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "proxy-gateway/**"
+      - ".github/workflows/proxy-gateway-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: proxy-gateway-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-quality:
+    name: Check and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: proxy-gateway/package-lock.json
+
+      - name: Install proxy-gateway dependencies
+        run: npm ci
+        working-directory: proxy-gateway
+
+      - name: Run gateway check
+        run: npm run check
+        working-directory: proxy-gateway
+
+      - name: Run gateway tests
+        run: npm run test
+        working-directory: proxy-gateway
